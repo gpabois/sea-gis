@@ -1,10 +1,5 @@
 use std::ops::{Deref, DerefMut};
 
-use sea_orm::Value;
-use sea_query::ValueType;
-
-use super::EWKBGeometry;
-
 pub type PointS = Point<2, f64>;
 pub type MultiPointS = MultiPoint<2, f64>;
 pub type LineStringS = LineString<2, f64>;
@@ -117,7 +112,7 @@ impl Geometry {
             Geometry::MultiPointZ(a) => a.srid = srid,
             Geometry::MultiLineStringZ(a) => a.srid = srid,
             Geometry::MultiPolygonZ(a) => a.srid = srid,
-        }       
+        }
     }
 
     pub fn srid(&self) -> u32 {
@@ -150,7 +145,10 @@ impl TryFrom<Geometry> for PointS {
     fn try_from(value: Geometry) -> Result<Self, Self::Error> {
         match value {
             Geometry::PointS(point) => Ok(point),
-            _ => Err(super::error::Error::invalid_geometry_kind(GeometryKind::PointS, value.kind()))
+            _ => Err(super::error::Error::invalid_geometry_kind(
+                GeometryKind::PointS,
+                value.kind(),
+            )),
         }
     }
 }
@@ -167,7 +165,10 @@ impl TryFrom<Geometry> for LineStringS {
     fn try_from(value: Geometry) -> Result<Self, Self::Error> {
         match value {
             Geometry::LineStringS(line_string) => Ok(line_string),
-            _ => Err(super::error::Error::invalid_geometry_kind(GeometryKind::LineStringS, value.kind()))
+            _ => Err(super::error::Error::invalid_geometry_kind(
+                GeometryKind::LineStringS,
+                value.kind(),
+            )),
         }
     }
 }
@@ -184,7 +185,10 @@ impl TryFrom<Geometry> for PolygonS {
     fn try_from(value: Geometry) -> Result<Self, Self::Error> {
         match value {
             Geometry::PolygonS(polygon) => Ok(polygon),
-            _ => Err(super::error::Error::invalid_geometry_kind(GeometryKind::PolygonS, value.kind()))
+            _ => Err(super::error::Error::invalid_geometry_kind(
+                GeometryKind::PolygonS,
+                value.kind(),
+            )),
         }
     }
 }
@@ -201,7 +205,10 @@ impl TryFrom<Geometry> for MultiPointS {
     fn try_from(value: Geometry) -> Result<Self, Self::Error> {
         match value {
             Geometry::MultiPointS(points) => Ok(points),
-            _ => Err(super::error::Error::invalid_geometry_kind(GeometryKind::MultiPointS, value.kind()))
+            _ => Err(super::error::Error::invalid_geometry_kind(
+                GeometryKind::MultiPointS,
+                value.kind(),
+            )),
         }
     }
 }
@@ -218,7 +225,10 @@ impl TryFrom<Geometry> for MultiLineStringS {
     fn try_from(value: Geometry) -> Result<Self, Self::Error> {
         match value {
             Geometry::MultiLineStringS(line_strings) => Ok(line_strings),
-            _ => Err(super::error::Error::invalid_geometry_kind(GeometryKind::MultiLineStringS, value.kind()))
+            _ => Err(super::error::Error::invalid_geometry_kind(
+                GeometryKind::MultiLineStringS,
+                value.kind(),
+            )),
         }
     }
 }
@@ -235,7 +245,10 @@ impl TryFrom<Geometry> for MultiPolygonS {
     fn try_from(value: Geometry) -> Result<Self, Self::Error> {
         match value {
             Geometry::MultiPolygonS(polygons) => Ok(polygons),
-            _ => Err(super::error::Error::invalid_geometry_kind(GeometryKind::MultiPolygonS, value.kind()))
+            _ => Err(super::error::Error::invalid_geometry_kind(
+                GeometryKind::MultiPolygonS,
+                value.kind(),
+            )),
         }
     }
 }
@@ -252,7 +265,10 @@ impl TryFrom<Geometry> for PointZ {
     fn try_from(value: Geometry) -> Result<Self, Self::Error> {
         match value {
             Geometry::PointZ(point) => Ok(point),
-            _ => Err(super::error::Error::invalid_geometry_kind(GeometryKind::PointZ, value.kind()))
+            _ => Err(super::error::Error::invalid_geometry_kind(
+                GeometryKind::PointZ,
+                value.kind(),
+            )),
         }
     }
 }
@@ -269,7 +285,10 @@ impl TryFrom<Geometry> for LineStringZ {
     fn try_from(value: Geometry) -> Result<Self, Self::Error> {
         match value {
             Geometry::LineStringZ(line_string) => Ok(line_string),
-            _ => Err(super::error::Error::invalid_geometry_kind(GeometryKind::LineStringZ, value.kind()))
+            _ => Err(super::error::Error::invalid_geometry_kind(
+                GeometryKind::LineStringZ,
+                value.kind(),
+            )),
         }
     }
 }
@@ -286,7 +305,10 @@ impl TryFrom<Geometry> for PolygonZ {
     fn try_from(value: Geometry) -> Result<Self, Self::Error> {
         match value {
             Geometry::PolygonZ(polygon) => Ok(polygon),
-            _ => Err(super::error::Error::invalid_geometry_kind(GeometryKind::PolygonZ, value.kind()))
+            _ => Err(super::error::Error::invalid_geometry_kind(
+                GeometryKind::PolygonZ,
+                value.kind(),
+            )),
         }
     }
 }
@@ -303,7 +325,10 @@ impl TryFrom<Geometry> for MultiPointZ {
     fn try_from(value: Geometry) -> Result<Self, Self::Error> {
         match value {
             Geometry::MultiPointZ(points) => Ok(points),
-            _ => Err(super::error::Error::invalid_geometry_kind(GeometryKind::MultiPointZ, value.kind()))
+            _ => Err(super::error::Error::invalid_geometry_kind(
+                GeometryKind::MultiPointZ,
+                value.kind(),
+            )),
         }
     }
 }
@@ -320,7 +345,10 @@ impl TryFrom<Geometry> for MultiLineStringZ {
     fn try_from(value: Geometry) -> Result<Self, Self::Error> {
         match value {
             Geometry::MultiLineStringZ(line_strings) => Ok(line_strings),
-            _ => Err(super::error::Error::invalid_geometry_kind(GeometryKind::MultiLineStringZ, value.kind()))
+            _ => Err(super::error::Error::invalid_geometry_kind(
+                GeometryKind::MultiLineStringZ,
+                value.kind(),
+            )),
         }
     }
 }
@@ -337,11 +365,13 @@ impl TryFrom<Geometry> for MultiPolygonZ {
     fn try_from(value: Geometry) -> Result<Self, Self::Error> {
         match value {
             Geometry::MultiPolygonZ(polygons) => Ok(polygons),
-            _ => Err(super::error::Error::invalid_geometry_kind(GeometryKind::MultiPolygonZ, value.kind()))
+            _ => Err(super::error::Error::invalid_geometry_kind(
+                GeometryKind::MultiPolygonZ,
+                value.kind(),
+            )),
         }
     }
 }
-
 
 /// Un vecteur dimension N.
 #[derive(PartialEq, Eq, Clone)]
@@ -353,13 +383,25 @@ impl<const N: usize, U> Vector<N, U> {
     }
 }
 
-impl<const N: usize, U> Vector<N, U> where U: Copy {
+impl<const N: usize, U> Vector<N, U>
+where
+    U: Copy,
+{
     pub fn x(&self) -> U {
         self.0[0]
     }
 
     pub fn y(&self) -> U {
         self.0[1]
+    }
+}
+
+impl<const N: usize, U> IntoIterator for Vector<N, U> {
+    type Item = U;
+    type IntoIter = std::array::IntoIter<U, N>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 
@@ -381,8 +423,15 @@ impl<const N: usize, U> DerefMut for Vector<N, U> {
 #[derive(Clone, PartialEq, Eq)]
 pub struct VectorArray<const N: usize, U>(Vec<Vector<N, U>>);
 
-impl<const N: usize, U> VectorArray<N, U> 
-where U: Copy + Ord
+impl<const N: usize, U> VectorArray<N, U> {
+    pub fn new(a: Vec<Vector<N, U>>) -> Self {
+        Self(a)
+    }
+}
+
+impl<const N: usize, U> VectorArray<N, U>
+where
+    U: Copy + PartialOrd,
 {
     pub fn min_x(&self) -> U {
         self.0.iter().map(Vector::x).min().unwrap()
@@ -407,6 +456,15 @@ impl<const N: usize, U> FromIterator<Vector<N, U>> for VectorArray<N, U> {
     }
 }
 
+impl<const N: usize, U> IntoIterator for VectorArray<N, U> {
+    type Item = Vector<N, U>;
+    type IntoIter = <Vec<Vector<N, U>> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 impl<const N: usize, U> Deref for VectorArray<N, U> {
     type Target = [Vector<N, U>];
 
@@ -424,8 +482,26 @@ impl<const N: usize, U> VectorMatrix<N, U> {
     }
 }
 
-impl<const N: usize, U> VectorMatrix<N, U> 
-where U: Copy + Ord
+impl<const N: usize, U> Deref for VectorMatrix<N, U> {
+    type Target = [VectorArray<N, U>];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<const N: usize, U> IntoIterator for VectorMatrix<N, U> {
+    type Item = VectorArray<N, U>;
+    type IntoIter = <Vec<VectorArray<N, U>> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<const N: usize, U> VectorMatrix<N, U>
+where
+    U: Copy + PartialOrd,
 {
     pub fn min_x(&self) -> U {
         self.0.iter().map(VectorArray::min_x).min().unwrap()
@@ -447,8 +523,32 @@ where U: Copy + Ord
 /// Un tenseur 3D de vecteur de dimension N
 pub struct VectorTensor<const N: usize, U>(Vec<VectorMatrix<N, U>>);
 
-impl<const N: usize, U> VectorTensor<N, U> 
-where U: Copy + Ord
+impl<const N: usize, U> VectorTensor<N, U> {
+    pub fn new(coordinates: Vec<VectorMatrix<N, U>>) -> Self {
+        Self(coordinates)
+    }
+}
+
+impl<const N: usize, U> Deref for VectorTensor<N, U> {
+    type Target = [VectorMatrix<N, U>];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<const N: usize, U> IntoIterator for VectorTensor<N, U> {
+    type Item = VectorMatrix<N, U>;
+    type IntoIter = <Vec<Self::Item> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<const N: usize, U> VectorTensor<N, U>
+where
+    U: Copy + PartialOrd,
 {
     pub fn min_x(&self) -> U {
         self.0.iter().map(VectorMatrix::min_x).min().unwrap()
@@ -487,13 +587,16 @@ impl<const N: usize, U> Point<N, U> {
     }
 }
 
-impl<const N: usize, U> Point<N, U> where U: Copy {
+impl<const N: usize, U> Point<N, U>
+where
+    U: Copy,
+{
     pub fn mbr(&self) -> MBR<U> {
         MBR {
             min_x: self.coordinates.x(),
             max_x: self.coordinates.x(),
             min_y: self.coordinates.y(),
-            max_y: self.coordinates.y()
+            max_y: self.coordinates.y(),
         }
     }
 }
@@ -518,13 +621,16 @@ pub struct MultiPoint<const N: usize, U> {
     pub srid: u32,
 }
 
-impl<const N: usize, U> MultiPoint<N, U> where U: Copy + Ord {
+impl<const N: usize, U> MultiPoint<N, U>
+where
+    U: Copy + PartialOrd,
+{
     pub fn mbr(&self) -> MBR<U> {
         MBR {
             min_x: self.coordinates.min_x(),
             max_x: self.coordinates.max_x(),
             min_y: self.coordinates.min_y(),
-            max_y: self.coordinates.max_y()
+            max_y: self.coordinates.max_y(),
         }
     }
 }
@@ -562,13 +668,16 @@ impl<const N: usize, U> LineString<N, U> {
     }
 }
 
-impl<const N: usize, U> LineString<N, U> where U: Copy + Ord {
+impl<const N: usize, U> LineString<N, U>
+where
+    U: Copy + PartialOrd,
+{
     pub fn mbr(&self) -> MBR<U> {
         MBR {
             min_x: self.coordinates.min_x(),
             max_x: self.coordinates.max_x(),
             min_y: self.coordinates.min_y(),
-            max_y: self.coordinates.max_y()
+            max_y: self.coordinates.max_y(),
         }
     }
 }
@@ -576,7 +685,7 @@ impl<const N: usize, U> LineString<N, U> where U: Copy + Ord {
 /// Un ensemble de lignes brisées.
 pub struct MultiLineString<const N: usize, U> {
     pub coordinates: VectorMatrix<N, U>,
-    pub srid: u32
+    pub srid: u32,
 }
 
 impl<const N: usize, U> MultiLineString<N, U> {
@@ -592,13 +701,16 @@ impl<const N: usize, U> MultiLineString<N, U> {
     }
 }
 
-impl<const N: usize, U> MultiLineString<N, U> where U: Copy + Ord {
+impl<const N: usize, U> MultiLineString<N, U>
+where
+    U: Copy + PartialOrd,
+{
     pub fn mbr(&self) -> MBR<U> {
         MBR {
             min_x: self.coordinates.min_x(),
             max_x: self.coordinates.max_x(),
             min_y: self.coordinates.min_y(),
-            max_y: self.coordinates.max_y()
+            max_y: self.coordinates.max_y(),
         }
     }
 }
@@ -609,7 +721,7 @@ pub struct Polygon<const N: usize, U> {
     pub srid: u32,
 }
 
-impl<const N: usize, U> Polygon<N,U> {
+impl<const N: usize, U> Polygon<N, U> {
     pub fn new(coordinates: VectorMatrix<N, U>) -> Self {
         Self {
             coordinates,
@@ -622,13 +734,16 @@ impl<const N: usize, U> Polygon<N,U> {
     }
 }
 
-impl<const N: usize, U> Polygon<N, U> where U: Copy + Ord {
+impl<const N: usize, U> Polygon<N, U>
+where
+    U: Copy + PartialOrd,
+{
     pub fn mbr(&self) -> MBR<U> {
         MBR {
             min_x: self.coordinates.min_x(),
             max_x: self.coordinates.max_x(),
             min_y: self.coordinates.min_y(),
-            max_y: self.coordinates.max_y()
+            max_y: self.coordinates.max_y(),
         }
     }
 }
@@ -636,10 +751,10 @@ impl<const N: usize, U> Polygon<N, U> where U: Copy + Ord {
 /// Un ensemble de polygones
 pub struct MultiPolygon<const N: usize, U> {
     pub coordinates: VectorTensor<N, U>,
-    pub srid: u32
+    pub srid: u32,
 }
 
-impl<const N: usize, U> MultiPolygon<N,U> {
+impl<const N: usize, U> MultiPolygon<N, U> {
     pub fn new(coordinates: VectorTensor<N, U>) -> Self {
         Self {
             coordinates,
@@ -652,13 +767,16 @@ impl<const N: usize, U> MultiPolygon<N,U> {
     }
 }
 
-impl<const N: usize, U> MultiPolygon<N, U> where U: Copy + Ord {
+impl<const N: usize, U> MultiPolygon<N, U>
+where
+    U: Copy + PartialOrd,
+{
     pub fn mbr(&self) -> MBR<U> {
         MBR {
             min_x: self.coordinates.min_x(),
             max_x: self.coordinates.max_x(),
             min_y: self.coordinates.min_y(),
-            max_y: self.coordinates.max_y()
+            max_y: self.coordinates.max_y(),
         }
     }
 }
@@ -668,6 +786,5 @@ pub struct MBR<U> {
     pub min_x: U,
     pub min_y: U,
     pub max_x: U,
-    pub max_y: U
+    pub max_y: U,
 }
-

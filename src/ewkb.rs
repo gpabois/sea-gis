@@ -1,24 +1,28 @@
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian, ReadBytesExt, WriteBytesExt};
-use sea_orm::{TryGetable, Value};
+use sea_orm::Value;
 use sea_query::ValueType;
 use std::{
-    convert::Infallible, default, io::{Cursor, Read, Write}, ops::{Deref, DerefMut}
+    io::{Cursor, Read, Write},
+    ops::{Deref, DerefMut},
 };
 
 use crate::PointZ;
 
 use super::{
-    Geometry, GeometryKind, LineString, LineStringS, LineStringZ, MultiLineString, MultiLineStringS, MultiLineStringZ, MultiPoint, MultiPointS, MultiPointZ, MultiPolygon, MultiPolygonS, MultiPolygonZ, Point, PointS, Polygon, PolygonS, PolygonZ, Vector, VectorArray, VectorMatrix, VectorTensor
+    Geometry, GeometryKind, LineString, LineStringS, LineStringZ, MultiLineString,
+    MultiLineStringS, MultiLineStringZ, MultiPoint, MultiPointS, MultiPointZ, MultiPolygon,
+    MultiPolygonS, MultiPolygonZ, Point, PointS, Polygon, PolygonS, PolygonZ, Vector, VectorArray,
+    VectorMatrix, VectorTensor,
 };
 
-/// Objet intermédiaire pour encoder/decoder 
+/// Objet intermédiaire pour encoder/decoder
 /// au format EWKB toute géométrie.
 pub struct EWKBGeometry(Geometry);
 
 impl From<EWKBGeometry> for Value {
     fn from(value: EWKBGeometry) -> Self {
         let mut buf = Vec::<u8>::default();
-        value.encode_ewkb(&mut buf).expect("cannot encode EWKB geometry");
+        value.encode(&mut buf).expect("cannot encode EWKB geometry");
         buf.into()
     }
 }
@@ -31,8 +35,11 @@ impl sea_orm::sea_query::Nullable for EWKBGeometry {
 impl ValueType for EWKBGeometry {
     fn try_from(v: Value) -> Result<Self, sea_query::ValueTypeErr> {
         match v {
-            Value::Bytes(Some(buf)) => EWKBGeometry::decode_ewkb(&mut buf).map_err(|| sea_query::ValueTypeErr),
-            _ => Err(sea_query::ValueTypeErr)
+            Value::Bytes(Some(boxed_buf)) => {
+                let mut buf = Cursor::new(boxed_buf.as_ref());
+                EWKBGeometry::decode(&mut buf).map_err(|_| sea_query::ValueTypeErr)
+            }
+            _ => Err(sea_query::ValueTypeErr),
         }
     }
 
@@ -64,13 +71,16 @@ impl Deref for EWKBGeometry {
 }
 
 impl DerefMut for EWKBGeometry {
-    fn deref_mut(&self) -> &Self::Target {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
 impl GeometryKind {
-    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(self, stream: &mut W) -> Result<(), std::io::Error> {
+    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
+        self,
+        stream: &mut W,
+    ) -> Result<(), std::io::Error> {
         let encoded = match self {
             GeometryKind::PointS => 1,
             GeometryKind::LineStringS => 2,
@@ -92,7 +102,9 @@ impl GeometryKind {
         stream.write_u32::<E>(encoded)
     }
 
-    pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(stream: &mut R) -> Result<Self, std::io::Error> {
+    pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(
+        stream: &mut R,
+    ) -> Result<Self, std::io::Error> {
         let kind = match stream.read_u32::<E>()? {
             1 => GeometryKind::PointS,
             2 => GeometryKind::LineStringS,
@@ -120,46 +132,44 @@ impl GeometryKind {
 const BIG_ENDIAN: u8 = 0;
 const LITTLE_ENDIAN: u8 = 1;
 
-impl TryFrom<&[u8]> for EWKBGeometry {
-    type Error = std::io::Error;
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        let mut buf = Cursor::new(value);
-        Self::decode_ewkb(&mut buf)
-    }
-}
 impl EWKBGeometry {
     /// Encode une géométrie au format EWKB dans le flux de sortie.
     ///
     /// Utilise par défaut le boutisme natif.
     pub fn encode<W: Write>(self, stream: &mut W) -> Result<(), std::io::Error> {
-        self.encode_ewkb_with_endianess::<NativeEndian>(stream)
+        self.encode_with_endianess::<NativeEndian, _>(stream)
     }
 
     /// Encode une géométrie au format EWKB dans le flux de sortie, avec un boutisme défini.
-    pub fn encode_with_endianess<E: ByteOrder, W: Write>(self, stream: &mut W) -> Result<(), std::io::Error> {
+    pub fn encode_with_endianess<E: ByteOrder, W: Write>(
+        self,
+        stream: &mut W,
+    ) -> Result<(), std::io::Error>
+    where
+        Endianess: From<E>,
+    {
         // Write endianness.
         stream.write_u8(Endianess::from(E::default()).into())?;
 
         // Write the EWKB type
-        self.kind().encode_ewkb(stream)?;
-    
+        self.kind().encode_ewkb::<E, _>(stream)?;
+
         // Write the SRID
         stream.write_u32::<E>(self.srid())?;
 
         match self.0 {
-            Geometry::PointS(a) => a.encode_ewkb::<E>(stream),
-            Geometry::LineStringS(a) => a.encode_ewkb::<E>(stream),
-            Geometry::PolygonS(a) => a.encode_ewkb::<E>(stream),
-            Geometry::MultiPointS(a) => a.encode_ewkb::<E>(stream),
-            Geometry::MultiLineStringS(a) => a.encode_ewkb::<E>(stream),
-            Geometry::MultiPolygonS(a) => a.encode_ewkb::<E>(stream),
-            Geometry::PointZ(a) => a.encode_ewkb::<E>(stream),
-            Geometry::LineStringZ(a) => a.encode_ewkb::<E>(stream),
-            Geometry::PolygonZ(a) => a.encode_ewkb::<E>(stream),
-            Geometry::MultiPointZ(a) => a.encode_ewkb::<E>(stream),
-            Geometry::MultiLineStringZ(a) => a.encode_ewkb::<E>(stream),
-            Geometry::MultiPolygonZ(a) => a.encode_ewkb::<E>(stream),
+            Geometry::PointS(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::LineStringS(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::PolygonS(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::MultiPointS(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::MultiLineStringS(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::MultiPolygonS(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::PointZ(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::LineStringZ(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::PolygonZ(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::MultiPointZ(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::MultiLineStringZ(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::MultiPolygonZ(a) => a.encode_ewkb::<E, _>(stream),
         }
     }
 
@@ -169,111 +179,129 @@ impl EWKBGeometry {
         let endianess = buf.read_u8()?;
 
         if endianess == BIG_ENDIAN {
-            Self::decode_ewkb_with_endianess::<BigEndian>(buf)
+            Self::decode_with_endianess::<BigEndian, _>(buf)
         } else {
-            Self::decode_ewkb_with_endianess::<LittleEndian>(buf)
+            Self::decode_with_endianess::<LittleEndian, _>(buf)
         }
     }
 
     /// Décode une géométrie avec un boutisme défini
-    pub fn decode_with_endianess<E: ByteOrder, R: Read>(stream: &mut R,) -> Result<Self, std::io::Error> {
-        let kind: GeometryKind = GeometryKind::decode_ewkb::<E>(stream)?;
-        let srid: u32 = stream.read_u32()?;
+    pub fn decode_with_endianess<E: ByteOrder, R: Read>(
+        stream: &mut R,
+    ) -> Result<Self, std::io::Error> {
+        let kind: GeometryKind = GeometryKind::decode_ewkb::<E, _>(stream)?;
+        let srid: u32 = stream.read_u32::<E>()?;
 
-        let mut geometry = match kind {
-            GeometryKind::PointS => PointS::decode_ewkb::<E>(stream)?.into(),
-            GeometryKind::LineStringS => LineStringS::decode_ewkb::<E>(stream)?.into(),
-            GeometryKind::PolygonS => PolygonS::decode_ewkb::<E>(stream)?.into(),
-            GeometryKind::MultiPointS => MultiPointS::decode_ewkb::<E>(stream)?.into(),
-            GeometryKind::MultiLineStringS => MultiLineStringS::decode_ewkb::<E>(stream)?.into(),
-            GeometryKind::MultiPolygonS => MultiPolygonS::decode_ewkb::<E>(stream)?.into(),
+        let mut geometry: Geometry = match kind {
+            GeometryKind::PointS => PointS::decode_ewkb::<E, _>(stream)?.into(),
+            GeometryKind::LineStringS => LineStringS::decode_ewkb::<E, _>(stream)?.into(),
+            GeometryKind::PolygonS => PolygonS::decode_ewkb::<E, _>(stream)?.into(),
+            GeometryKind::MultiPointS => MultiPointS::decode_ewkb::<E, _>(stream)?.into(),
+            GeometryKind::MultiLineStringS => MultiLineStringS::decode_ewkb::<E, _>(stream)?.into(),
+            GeometryKind::MultiPolygonS => MultiPolygonS::decode_ewkb::<E, _>(stream)?.into(),
             GeometryKind::GeometryCollectionS => todo!(),
-            GeometryKind::PointZ => PointZ::decode::<E>(stream)?.into(),
-            GeometryKind::LineStringZ => LineStringZ::decode_ewkb::<E>(stream)?.into(),
-            GeometryKind::PolygonZ => PolygonZ::decode_ewkb::<E>(stream)?.into(),
-            GeometryKind::MultiPointZ => MultiPointZ::decode_ewkb::<E>(stream)?.into(),
-            GeometryKind::MultiLineStringZ => MultiPointZ::decode_ewkb::<E>(stream)?.into(),
-            GeometryKind::MultiPolygonZ => MultiPolygonZ::decode_ewkb::<E>(stream)?.into(),
-            GeometryKind::GeometryCollectionZ => todo!()
+            GeometryKind::PointZ => PointZ::decode_ewkb::<E, _>(stream)?.into(),
+            GeometryKind::LineStringZ => LineStringZ::decode_ewkb::<E, _>(stream)?.into(),
+            GeometryKind::PolygonZ => PolygonZ::decode_ewkb::<E, _>(stream)?.into(),
+            GeometryKind::MultiPointZ => MultiPointZ::decode_ewkb::<E, _>(stream)?.into(),
+            GeometryKind::MultiLineStringZ => MultiLineStringZ::decode_ewkb::<E, _>(stream)?.into(),
+            GeometryKind::MultiPolygonZ => MultiPolygonZ::decode_ewkb::<E, _>(stream)?.into(),
+            GeometryKind::GeometryCollectionZ => todo!(),
         };
 
         geometry.set_srid(srid);
 
-        Ok(geometry)
+        Ok(EWKBGeometry(geometry))
     }
 }
 
 impl<const N: usize> Point<N, f64> {
     /// Encode un point dans un flux binaire.
-    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(self, stream: &mut W) -> Result<(), std::io::Error> {
-        self.coordinates.encode_ewkb::<E>(stream)
+    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
+        self,
+        stream: &mut W,
+    ) -> Result<(), std::io::Error> {
+        self.coordinates.encode_ewkb::<E, _>(stream)
     }
 
     /// Décode un point depuis un flux binaire
     pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(value: &mut R) -> Result<Self, std::io::Error> {
-        let coordinates = Vector::<N, f64>::decode_ewkb::<E>(value)?;
+        let coordinates = Vector::<N, f64>::decode_ewkb::<E, _>(value)?;
         Ok(Self::new(coordinates))
     }
 }
 
 impl<const N: usize> MultiPoint<N, f64> {
     /// Encode un ensemble de points dans un flux binaire
-    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(self, stream: &mut W) -> Result<(), std::io::Error> {
-        self.coordinates.encode_ewkb::<E>(stream)
+    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
+        self,
+        stream: &mut W,
+    ) -> Result<(), std::io::Error> {
+        self.coordinates.encode_ewkb::<E, _>(stream)
     }
 
     /// Décode un point depuis un flux binaire
     pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(value: &mut R) -> Result<Self, std::io::Error> {
-        let coordinates = VectorArray::<N, f64>::decode_ewkb::<E>(value)?;
+        let coordinates = VectorArray::<N, f64>::decode_ewkb::<E, _>(value)?;
         Ok(Self::new(coordinates))
     }
 }
 
 impl<const N: usize> LineString<N, f64> {
     /// Encode un ensemble de points dans un flux binaire
-    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(self, stream: &mut W) -> Result<(), std::io::Error> {
-        self.coordinates.encode_ewkb::<E>(stream)
+    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
+        self,
+        stream: &mut W,
+    ) -> Result<(), std::io::Error> {
+        self.coordinates.encode_ewkb::<E, _>(stream)
     }
 
     /// Décode un point depuis un flux binaire
     pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(value: &mut R) -> Result<Self, std::io::Error> {
-        let coordinates = VectorArray::<N, f64>::decode_ewkb::<E>(value)?;
+        let coordinates = VectorArray::<N, f64>::decode_ewkb::<E, _>(value)?;
         Ok(Self::new(coordinates))
     }
 }
 
 impl<const N: usize> MultiLineString<N, f64> {
     /// Encode dans un flux binaire
-    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(self, stream: &mut W) -> Result<(), std::io::Error> {
-        self.coordinates.encode_ewkb::<E>(stream)
+    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
+        self,
+        stream: &mut W,
+    ) -> Result<(), std::io::Error> {
+        self.coordinates.encode_ewkb::<E, _>(stream)
     }
 
     /// Décode depuis un flux binaire
-    pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(
-        value: &mut R,
-    ) -> Result<Self, std::io::Error> {
-        let coordinates = VectorMatrix::<N, f64>::decode_ewkb::<E>(value)?;
+    pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(value: &mut R) -> Result<Self, std::io::Error> {
+        let coordinates = VectorMatrix::<N, f64>::decode_ewkb::<E, _>(value)?;
         Ok(Self::new(coordinates))
     }
 }
 
 impl<const N: usize> Polygon<N, f64> {
-    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(self, stream: &mut W) -> Result<(), std::io::Error> {
-        self.coordinates.encode_ewkb::<E>(stream)
+    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
+        self,
+        stream: &mut W,
+    ) -> Result<(), std::io::Error> {
+        self.coordinates.encode_ewkb::<E, _>(stream)
     }
 
     pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(value: &mut R) -> Result<Self, std::io::Error> {
-        let coordinates = VectorMatrix::<N, f64>::decode_ewkb::<E>(value)?;
+        let coordinates = VectorMatrix::<N, f64>::decode_ewkb::<E, _>(value)?;
         Ok(Self::new(coordinates))
     }
 }
 
 impl<const N: usize> MultiPolygon<N, f64> {
-    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(self, stream: &mut W) -> Result<(), std::io::Error> {
-        self.coordinates.encode_ewkb::<E>(stream)
+    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
+        self,
+        stream: &mut W,
+    ) -> Result<(), std::io::Error> {
+        self.coordinates.encode_ewkb::<E, _>(stream)
     }
     pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(value: &mut R) -> Result<Self, std::io::Error> {
-        let coordinates = VectorTensor::<N, f64>::decode_ewkb::<E>(value)?;
+        let coordinates = VectorTensor::<N, f64>::decode_ewkb::<E, _>(value)?;
         Ok(Self::new(coordinates))
     }
 }
@@ -283,9 +311,9 @@ impl<const N: usize> Vector<N, f64> {
     pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
         self,
         stream: &mut W,
-    ) -> Result<Self, std::io::Error> {
+    ) -> Result<(), std::io::Error> {
         for i in 0..N {
-            stream.write_f64::<E>(self.coordinates[i])?;
+            stream.write_f64::<E>(self[i])?;
         }
 
         Ok(())
@@ -293,7 +321,7 @@ impl<const N: usize> Vector<N, f64> {
 
     /// Décode un vecteur n-D
     pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(value: &mut R) -> Result<Self, std::io::Error> {
-        let mut coordinates: [f64; N] = [0; N];
+        let mut coordinates: [f64; N] = [0f64; N];
 
         for i in 0..N {
             coordinates[i] = value.read_f64::<E>()?;
@@ -313,19 +341,21 @@ impl<const N: usize> VectorArray<N, f64> {
         stream.write_u32::<E>(self.len() as u32)?;
 
         for vector in self.into_iter() {
-            vector.encode_ewkb::<E>(stream)?;
+            vector.encode_ewkb::<E, _>(stream)?;
         }
 
         Ok(())
     }
 
     /// Décode une liste de vecteurs depuis un flux d'entrée.
-    pub(self) fn decode_ewkb<ENDIAN: ByteOrder, R: Read>(stream: &mut R) -> Result<Self, std::io::Error> {
-        let nb_points: u32 = stream.read_u32::<ENDIAN>()?;
-        let mut coordinates = Vec::<Vector<N, f32>>::with_capacity(nb_points as usize);
+    pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(
+        stream: &mut R,
+    ) -> Result<Self, std::io::Error> {
+        let nb_points: u32 = stream.read_u32::<E>()?;
+        let mut coordinates = Vec::<Vector<N, f64>>::with_capacity(nb_points as usize);
 
-        for i in 0..nb_points {
-            coordinates.push(Vector::decode_ewkb::<ENDIAN>(stream)?);
+        for _ in 0..nb_points {
+            coordinates.push(Vector::decode_ewkb::<E, _>(stream)?);
         }
 
         Ok(Self::new(coordinates))
@@ -333,13 +363,29 @@ impl<const N: usize> VectorArray<N, f64> {
 }
 
 impl<const N: usize> VectorMatrix<N, f64> {
-    /// Décode un vecteur n-D
-    pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(stream: &mut R) -> Result<Self, std::io::Error> {
-        let nb_points: u32 = stream.read_u32::<E>()?;
-        let mut coordinates = Vec::<VectorArray<N, f32>>::with_capacity(nb_points as usize);
+    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
+        self,
+        stream: &mut W,
+    ) -> Result<(), std::io::Error> {
+        // Write number of points.
+        stream.write_u32::<E>(self.len() as u32)?;
 
-        for i in 0..nb_points {
-            coordinates.push(VectorArray::decode_ewkb::<E>(stream)?);
+        for vector in self.into_iter() {
+            vector.encode_ewkb::<E, _>(stream)?;
+        }
+
+        Ok(())
+    }
+
+    /// Décode un vecteur n-D
+    pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(
+        stream: &mut R,
+    ) -> Result<Self, std::io::Error> {
+        let nb_points: u32 = stream.read_u32::<E>()?;
+        let mut coordinates = Vec::<VectorArray<N, f64>>::with_capacity(nb_points as usize);
+
+        for _ in 0..nb_points {
+            coordinates.push(VectorArray::<N, f64>::decode_ewkb::<E, _>(stream)?);
         }
 
         Ok(Self::new(coordinates))
@@ -347,32 +393,47 @@ impl<const N: usize> VectorMatrix<N, f64> {
 }
 
 impl<const N: usize> VectorTensor<N, f64> {
-    /// Décode un vecteur n-D
-    pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(stream: &mut R) -> Result<Self, std::io::Error> {
-        let nb_points: u32 = stream.read_u32::<E>()?;
-        let mut coordinates = Vec::<VectorMatrix<N, f32>>::with_capacity(nb_points as usize);
+    pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
+        self,
+        stream: &mut W,
+    ) -> Result<(), std::io::Error> {
+        // Write number of points.
+        stream.write_u32::<E>(self.len() as u32)?;
 
-        for i in 0..nb_points {
-            coordinates.push(VectorMatrix::decode_ewkb::<E>(stream)?);
+        for vector in self.into_iter() {
+            vector.encode_ewkb::<E, _>(stream)?;
+        }
+
+        Ok(())
+    }
+    /// Décode un vecteur n-D
+    pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(
+        stream: &mut R,
+    ) -> Result<Self, std::io::Error> {
+        let nb_points: u32 = stream.read_u32::<E>()?;
+        let mut coordinates = Vec::<VectorMatrix<N, f64>>::with_capacity(nb_points as usize);
+
+        for _ in 0..nb_points {
+            coordinates.push(VectorMatrix::<N, f64>::decode_ewkb::<E, _>(stream)?);
         }
 
         Ok(Self::new(coordinates))
     }
 }
 
-pub enum Endianess {
+enum Endianess {
     BigEndian,
     LittleEndian,
 }
 
 impl From<BigEndian> for Endianess {
-    fn from(value: BigEndian) -> Self {
+    fn from(_value: BigEndian) -> Self {
         Endianess::BigEndian
     }
 }
 
 impl From<LittleEndian> for Endianess {
-    fn from(value: LittleEndian) -> Self {
+    fn from(_value: LittleEndian) -> Self {
         Endianess::LittleEndian
     }
 }
