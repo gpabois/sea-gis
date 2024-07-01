@@ -6,12 +6,10 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::PointZ;
-
-use super::{
+use super::types::{
     Geometry, GeometryKind, LineString, LineStringS, LineStringZ, MultiLineString,
     MultiLineStringS, MultiLineStringZ, MultiPoint, MultiPointS, MultiPointZ, MultiPolygon,
-    MultiPolygonS, MultiPolygonZ, Point, PointS, Polygon, PolygonS, PolygonZ, Vector, VectorArray,
+    MultiPolygonS, MultiPolygonZ, Point, PointZ, PointS, Polygon, PolygonS, PolygonZ, Vector, VectorArray,
     VectorMatrix, VectorTensor,
 };
 
@@ -59,6 +57,12 @@ impl ValueType for EWKBGeometry {
 impl From<EWKBGeometry> for Geometry {
     fn from(value: EWKBGeometry) -> Self {
         value.0
+    }
+}
+
+impl From<Geometry> for EWKBGeometry {
+    fn from(value: Geometry) -> Self {
+        Self(value)
     }
 }
 
@@ -421,7 +425,7 @@ impl<const N: usize> VectorTensor<N, f64> {
     }
 }
 
-enum Endianess {
+pub enum Endianess {
     BigEndian,
     LittleEndian,
 }

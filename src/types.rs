@@ -434,19 +434,19 @@ where
     U: Copy + PartialOrd,
 {
     pub fn min_x(&self) -> U {
-        self.0.iter().map(Vector::x).min().unwrap()
+        self.0.iter().map(Vector::x).min_by(|a,b| a.partial_cmp(b).unwrap()).unwrap()
     }
 
     pub fn max_x(&self) -> U {
-        self.0.iter().map(Vector::x).max().unwrap()
+        self.0.iter().map(Vector::x).max_by(|a,b| a.partial_cmp(b).unwrap()).unwrap()
     }
 
     pub fn min_y(&self) -> U {
-        self.0.iter().map(Vector::y).min().unwrap()
+        self.0.iter().map(Vector::y).min_by(|a,b| a.partial_cmp(b).unwrap()).unwrap()
     }
 
     pub fn max_y(&self) -> U {
-        self.0.iter().map(Vector::y).max().unwrap()
+        self.0.iter().map(Vector::y).max_by(|a,b| a.partial_cmp(b).unwrap()).unwrap()
     }
 }
 
@@ -504,19 +504,19 @@ where
     U: Copy + PartialOrd,
 {
     pub fn min_x(&self) -> U {
-        self.0.iter().map(VectorArray::min_x).min().unwrap()
+        self.0.iter().map(VectorArray::min_x).min_by(|a,b| a.partial_cmp(b).unwrap()).unwrap()
     }
 
     pub fn max_x(&self) -> U {
-        self.0.iter().map(VectorArray::max_x).max().unwrap()
+        self.0.iter().map(VectorArray::max_x).max_by(|a,b| a.partial_cmp(b).unwrap()).unwrap()
     }
 
     pub fn min_y(&self) -> U {
-        self.0.iter().map(VectorArray::min_y).min().unwrap()
+        self.0.iter().map(VectorArray::min_y).min_by(|a,b| a.partial_cmp(b).unwrap()).unwrap()
     }
 
     pub fn max_y(&self) -> U {
-        self.0.iter().map(VectorArray::max_y).max().unwrap()
+        self.0.iter().map(VectorArray::max_y).max_by(|a,b| a.partial_cmp(b).unwrap()).unwrap()
     }
 }
 
@@ -551,19 +551,19 @@ where
     U: Copy + PartialOrd,
 {
     pub fn min_x(&self) -> U {
-        self.0.iter().map(VectorMatrix::min_x).min().unwrap()
+        self.0.iter().map(VectorMatrix::min_x).min_by(|a,b| a.partial_cmp(b).unwrap()).unwrap()
     }
 
     pub fn max_x(&self) -> U {
-        self.0.iter().map(VectorMatrix::max_x).max().unwrap()
+        self.0.iter().map(VectorMatrix::max_x).max_by(|a,b| a.partial_cmp(b).unwrap()).unwrap()
     }
 
     pub fn min_y(&self) -> U {
-        self.0.iter().map(VectorMatrix::min_y).min().unwrap()
+        self.0.iter().map(VectorMatrix::min_y).min_by(|a,b| a.partial_cmp(b).unwrap()).unwrap()
     }
 
     pub fn max_y(&self) -> U {
-        self.0.iter().map(VectorMatrix::max_y).max().unwrap()
+        self.0.iter().map(VectorMatrix::max_y).max_by(|a,b| a.partial_cmp(b).unwrap()).unwrap()
     }
 }
 
@@ -575,9 +575,9 @@ pub struct Point<const N: usize, U> {
 }
 
 impl<const N: usize, U> Point<N, U> {
-    pub fn new(coordinates: Vector<N, U>) -> Self {
+    pub fn new<V: Into<Vector<N, U>>>(coordinates: V) -> Self {
         Self {
-            coordinates,
+            coordinates: coordinates.into(),
             srid: 4326,
         }
     }
@@ -636,9 +636,9 @@ where
 }
 
 impl<const N: usize, U> MultiPoint<N, U> {
-    pub fn new(coordinates: VectorArray<N, U>) -> Self {
+    pub fn new<V: Into<VectorArray<N, U>>>(coordinates: V) -> Self {
         Self {
-            coordinates,
+            coordinates: coordinates.into(),
             srid: 4326,
         }
     }
@@ -656,9 +656,9 @@ pub struct LineString<const N: usize, U> {
 }
 
 impl<const N: usize, U> LineString<N, U> {
-    pub fn new(coordinates: VectorArray<N, U>) -> Self {
+    pub fn new<V: Into<VectorArray<N, U>>>(coordinates: V) -> Self {
         Self {
-            coordinates,
+            coordinates: coordinates.into(),
             srid: 4326,
         }
     }
@@ -689,9 +689,9 @@ pub struct MultiLineString<const N: usize, U> {
 }
 
 impl<const N: usize, U> MultiLineString<N, U> {
-    pub fn new(coordinates: VectorMatrix<N, U>) -> Self {
+    pub fn new<V: Into<VectorMatrix<N, U>>>(coordinates: V) -> Self {
         Self {
-            coordinates,
+            coordinates: coordinates.into(),
             srid: 4326,
         }
     }
@@ -722,9 +722,9 @@ pub struct Polygon<const N: usize, U> {
 }
 
 impl<const N: usize, U> Polygon<N, U> {
-    pub fn new(coordinates: VectorMatrix<N, U>) -> Self {
+    pub fn new<V: Into<VectorMatrix<N, U>>>(coordinates: V) -> Self {
         Self {
-            coordinates,
+            coordinates: coordinates.into(),
             srid: 4326,
         }
     }
@@ -755,9 +755,9 @@ pub struct MultiPolygon<const N: usize, U> {
 }
 
 impl<const N: usize, U> MultiPolygon<N, U> {
-    pub fn new(coordinates: VectorTensor<N, U>) -> Self {
+    pub fn new<V: Into<VectorTensor<N, U>>>(coordinates: V) -> Self {
         Self {
-            coordinates,
+            coordinates: coordinates.into(),
             srid: 4326,
         }
     }
