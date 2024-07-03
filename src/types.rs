@@ -14,7 +14,7 @@ pub type MultiLineStringZ = MultiLineString<3, f64>;
 pub type PolygonZ = Polygon<3, f64>;
 pub type MultiPolygonZ = MultiPolygon<3, f64>;
 
-#[derive(Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum GeometryKind {
     /// 2D point
     PointS,
@@ -47,6 +47,7 @@ pub enum GeometryKind {
     GeometryCollectionZ,
 }
 
+#[derive(Clone, PartialEq)]
 pub enum Geometry {
     PointS(PointS),
     LineStringS(LineStringS),
@@ -374,8 +375,14 @@ impl TryFrom<Geometry> for MultiPolygonZ {
 }
 
 /// Un vecteur dimension N.
-#[derive(PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Vector<const N: usize, U>([U; N]);
+
+impl<const N: usize, U> From<[U;N]> for Vector<N, U> {
+    fn from(value: [U;N]) -> Self {
+        Self(value)
+    }
+}
 
 impl<const N: usize, U> Vector<N, U> {
     pub fn new(coordinates: [U; N]) -> Self {
@@ -473,6 +480,7 @@ impl<const N: usize, U> Deref for VectorArray<N, U> {
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
 /// Une matrice 2D de vecteur de dimension N.
 pub struct VectorMatrix<const N: usize, U>(Vec<VectorArray<N, U>>);
 
@@ -520,6 +528,7 @@ where
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
 /// Un tenseur 3D de vecteur de dimension N
 pub struct VectorTensor<const N: usize, U>(Vec<VectorMatrix<N, U>>);
 
@@ -568,7 +577,7 @@ where
 }
 
 /// Un point dans un espace n-d.
-#[derive(PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Point<const N: usize, U> {
     pub coordinates: Vector<N, U>,
     pub srid: u32,
@@ -615,6 +624,7 @@ impl<const N: usize, U> DerefMut for Point<N, U> {
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
 /// Un ensemble de point non relié dans un espace 2D.
 pub struct MultiPoint<const N: usize, U> {
     pub coordinates: VectorArray<N, U>,
@@ -682,6 +692,7 @@ where
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
 /// Un ensemble de lignes brisées.
 pub struct MultiLineString<const N: usize, U> {
     pub coordinates: VectorMatrix<N, U>,
@@ -715,6 +726,7 @@ where
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
 /// Un polygone
 pub struct Polygon<const N: usize, U> {
     pub coordinates: VectorMatrix<N, U>,
@@ -748,6 +760,7 @@ where
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
 /// Un ensemble de polygones
 pub struct MultiPolygon<const N: usize, U> {
     pub coordinates: VectorTensor<N, U>,
@@ -781,6 +794,7 @@ where
     }
 }
 
+#[derive(Clone, PartialEq, Eq)]
 /// Rectangle à limite minimum (minimum bounding rectangle)
 pub struct MBR<U> {
     pub min_x: U,

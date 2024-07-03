@@ -1,9 +1,24 @@
-use super::GeometryKind;
+use core::fmt;
 
+use super::types::GeometryKind;
+
+#[derive(Debug)]
 pub enum Error {
     InvalidGeometryKind {
         expecting: GeometryKind,
         got: GeometryKind
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        todo!()
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        None
     }
 }
 
