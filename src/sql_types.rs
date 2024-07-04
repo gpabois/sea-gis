@@ -5,7 +5,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use sea_orm::{JsonValue, Value};
+use sea_orm::Value;
 use sea_query::{Nullable, ValueType};
 
 use crate::{
