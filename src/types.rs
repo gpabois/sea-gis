@@ -1,3 +1,8 @@
+//! Module contenant les types primaires de géométrie.
+//!
+//! Les objets intermédiaires depuis sql_types permettent d'encoder/décoder depuis une base de
+//! donnée SQL (PostGIS, SpatiaLite)
+//!
 use std::ops::{Deref, DerefMut};
 
 pub type PointS = Point<2, f64>;
@@ -14,39 +19,7 @@ pub type MultiLineStringZ = MultiLineString<3, f64>;
 pub type PolygonZ = Polygon<3, f64>;
 pub type MultiPolygonZ = MultiPolygon<3, f64>;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum GeometryKind {
-    /// 2D point
-    PointS,
-    /// 2D line string
-    LineStringS,
-    /// 2D polygon
-    PolygonS,
-    /// 2D set of points
-    MultiPointS,
-    /// 2D set of line strings
-    MultiLineStringS,
-    /// 2D set of polygons
-    MultiPolygonS,
-    /// 2D set of geometries
-    GeometryCollectionS,
-
-    /// 3D point
-    PointZ,
-    /// 3D line string
-    LineStringZ,
-    /// 3D polygon
-    PolygonZ,
-    /// 3D set of points
-    MultiPointZ,
-    /// 3D set of line strings
-    MultiLineStringZ,
-    /// 3D set of polygons
-    MultiPolygonZ,
-    /// 3D set of geometries
-    GeometryCollectionZ,
-}
-
+/// Représente toutes les géométries possibles.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Geometry {
     PointS(PointS),
@@ -132,6 +105,40 @@ impl Geometry {
             Geometry::MultiPolygonZ(a) => a.srid,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+/// Représente la classe de la géométrie.
+pub enum GeometryKind {
+    /// 2D point
+    PointS,
+    /// 2D line string
+    LineStringS,
+    /// 2D polygon
+    PolygonS,
+    /// 2D set of points
+    MultiPointS,
+    /// 2D set of line strings
+    MultiLineStringS,
+    /// 2D set of polygons
+    MultiPolygonS,
+    /// 2D set of geometries
+    GeometryCollectionS,
+
+    /// 3D point
+    PointZ,
+    /// 3D line string
+    LineStringZ,
+    /// 3D polygon
+    PolygonZ,
+    /// 3D set of points
+    MultiPointZ,
+    /// 3D set of line strings
+    MultiLineStringZ,
+    /// 3D set of polygons
+    MultiPolygonZ,
+    /// 3D set of geometries
+    GeometryCollectionZ,
 }
 
 impl From<PointS> for Geometry {
@@ -436,6 +443,25 @@ impl<const N: usize, U> VectorArray<N, U> {
     }
 }
 
+impl<const R: usize, const N: usize, U> From<[[U; N]; R]> for VectorArray<N, U> {
+    fn from(value: [[U; N]; R]) -> Self {
+        Self::from_iter(value.into_iter().map(Vector::from))
+    }
+}
+
+impl<const N: usize, U> VectorArray<N, U>
+where
+    U: Clone + PartialEq,
+{
+    /// Vérifie que la liste de points forme un anneau, sinon le ferme automatiquement.
+    pub fn close_ring(&mut self) {
+        if self.first() != self.last() {
+            self.0
+                .push(self.first().cloned().expect("ring must not be empty"));
+        }
+    }
+}
+
 impl<const N: usize, U> VectorArray<N, U>
 where
     U: Copy + PartialOrd,
@@ -506,11 +532,51 @@ impl<const N: usize, U> VectorMatrix<N, U> {
     }
 }
 
+impl<const N: usize, U, T1> From<T1> for VectorMatrix<N, U>
+where
+    VectorArray<N, U>: From<T1>,
+{
+    fn from(value: T1) -> Self {
+        Self::new(vec![VectorArray::from(value)])
+    }
+}
+
+impl<const N: usize, U, T1, T2> From<(T1, T2)> for VectorMatrix<N, U>
+where
+    VectorArray<N, U>: From<T1>,
+    VectorArray<N, U>: From<T2>,
+{
+    fn from(value: (T1, T2)) -> Self {
+        Self::new(vec![VectorArray::from(value.0), VectorArray::from(value.1)])
+    }
+}
+
+impl<const N: usize, U, T1, T2, T3> From<(T1, T2, T3)> for VectorMatrix<N, U>
+where
+    VectorArray<N, U>: From<T1>,
+    VectorArray<N, U>: From<T2>,
+    VectorArray<N, U>: From<T3>,
+{
+    fn from(value: (T1, T2, T3)) -> Self {
+        Self::new(vec![
+            VectorArray::from(value.0),
+            VectorArray::from(value.1),
+            VectorArray::from(value.2),
+        ])
+    }
+}
+
 impl<const N: usize, U> Deref for VectorMatrix<N, U> {
     type Target = [VectorArray<N, U>];
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl<const N: usize, U> DerefMut for VectorMatrix<N, U> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -781,16 +847,21 @@ pub struct Polygon<const N: usize, U> {
     pub srid: u32,
 }
 
-impl<const N: usize, U> Polygon<N, U> {
-    pub fn new<V: Into<VectorMatrix<N, U>>>(coordinates: V) -> Self {
+impl<const N: usize, U> Polygon<N, U>
+where
+    U: PartialEq + Clone,
+{
+    /// Crée un nouveau polygone, avec un SRID de 4326 par défaut.
+    pub fn new<V: Into<VectorMatrix<N, U>>>(args: V) -> Self {
+        let mut coordinates: VectorMatrix<N, U> = args.into();
+
+        // Ensure we close all rings.
+        coordinates.iter_mut().for_each(|v| v.close_ring());
+
         Self {
-            coordinates: coordinates.into(),
+            coordinates,
             srid: 4326,
         }
-    }
-
-    pub fn new_with_srid(coordinates: VectorMatrix<N, U>, srid: u32) -> Self {
-        Self { coordinates, srid }
     }
 }
 

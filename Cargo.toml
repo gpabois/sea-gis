@@ -1,5 +1,5 @@
 [package]
-name = "sea-gis"
+name = "sql-gis"
 version = "0.1.0"
 edition = "2021"
 

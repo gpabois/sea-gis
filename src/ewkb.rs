@@ -1,53 +1,72 @@
+//! Module contenant les objets permettant d'encoder/décoder au format Extended Well-Known Bytes
+//! (EWKB)
+//!
+//! Voir [self::EWKBGeometry]
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian, ReadBytesExt, WriteBytesExt};
 
 use std::{
     io::{Cursor, Read, Write},
+    marker::PhantomData,
     ops::{Deref, DerefMut},
 };
 
 use super::types::{
     Geometry, GeometryKind, LineString, LineStringS, LineStringZ, MultiLineString,
     MultiLineStringS, MultiLineStringZ, MultiPoint, MultiPointS, MultiPointZ, MultiPolygon,
-    MultiPolygonS, MultiPolygonZ, Point, PointZ, PointS, Polygon, PolygonS, PolygonZ, Vector, VectorArray,
-    VectorMatrix, VectorTensor,
+    MultiPolygonS, MultiPolygonZ, Point, PointS, PointZ, Polygon, PolygonS, PolygonZ, Vector,
+    VectorArray, VectorMatrix, VectorTensor,
 };
 
 /// Objet intermédiaire pour encoder/decoder
 /// au format EWKB toute géométrie.
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EWKBGeometry(Geometry);
 
 /// Implémente l'encodage / décodage depuis sqlx
 mod sqlx {
-    use sqlx::{Database, Decode, Encode};
     use super::EWKBGeometry;
+    use sqlx::{Database, Decode, Encode};
 
-
-    impl<'r, DB> Decode<'r,DB> for EWKBGeometry 
-    where DB: Database, &'r [u8]: Decode<'r, DB>
+    impl<'r, DB> Decode<'r, DB> for EWKBGeometry
+    where
+        DB: Database,
+        &'r [u8]: Decode<'r, DB>,
     {
-        fn decode(value: <DB as sqlx::database::HasValueRef<'r>>::ValueRef) -> Result<Self, sqlx::error::BoxDynError> {
+        fn decode(
+            value: <DB as sqlx::database::HasValueRef<'r>>::ValueRef,
+        ) -> Result<Self, sqlx::error::BoxDynError> {
             let encoded = <&'r [u8] as Decode<DB>>::decode(value)?;
             let decoded = Self::try_from(encoded)?;
             Ok(decoded)
         }
-    } 
+    }
 
-    impl<'q, DB> Encode<'q, DB> for EWKBGeometry 
-    where DB: Database, Vec<u8>: Encode<'q, DB>
+    impl<'q, DB> Encode<'q, DB> for EWKBGeometry
+    where
+        DB: Database,
+        Vec<u8>: Encode<'q, DB>,
     {
-        fn encode_by_ref(&self, buf: &mut <DB as sqlx::database::HasArguments<'q>>::ArgumentBuffer) -> sqlx::encode::IsNull {
+        fn encode_by_ref(
+            &self,
+            buf: &mut <DB as sqlx::database::HasArguments<'q>>::ArgumentBuffer,
+        ) -> sqlx::encode::IsNull {
             let mut encoded = Vec::<u8>::new();
-            self.clone().encode_to_stream(&mut encoded).expect("cannot encode EWKB");
+            self.clone()
+                .encode_to_stream(&mut encoded)
+                .expect("cannot encode EWKB");
             encoded.encode_by_ref(buf)
         }
-        
-        fn encode(self, buf: &mut <DB as sqlx::database::HasArguments<'q>>::ArgumentBuffer) -> sqlx::encode::IsNull
+
+        fn encode(
+            self,
+            buf: &mut <DB as sqlx::database::HasArguments<'q>>::ArgumentBuffer,
+        ) -> sqlx::encode::IsNull
         where
             Self: Sized,
         {
             let mut encoded = Vec::<u8>::new();
-            self.encode_to_stream(&mut encoded).expect("cannot encode EWKB");
+            self.encode_to_stream(&mut encoded)
+                .expect("cannot encode EWKB");
             encoded.encode(buf)
         }
     }
@@ -56,13 +75,15 @@ mod sqlx {
 /// Implémente l'encodage / décodage pour Sea ORM
 mod sea_orm {
     use super::*;
-    
-    use sea_query::{Value, ValueType, Nullable, ColumnType, ArrayType};
+
+    use sea_query::{ArrayType, ColumnType, Nullable, Value, ValueType};
 
     impl From<EWKBGeometry> for Value {
         fn from(value: EWKBGeometry) -> Self {
             let mut buf = Vec::<u8>::default();
-            value.encode_to_stream(&mut buf).expect("cannot encode EWKB geometry");
+            value
+                .encode_to_stream(&mut buf)
+                .expect("cannot encode EWKB geometry");
             buf.into()
         }
     }
@@ -71,7 +92,7 @@ mod sea_orm {
             sea_orm::Value::Bytes(None)
         }
     }
-    
+
     impl ValueType for EWKBGeometry {
         fn try_from(v: Value) -> Result<Self, sea_query::ValueTypeErr> {
             match v {
@@ -82,20 +103,19 @@ mod sea_orm {
                 _ => Err(sea_query::ValueTypeErr),
             }
         }
-    
+
         fn type_name() -> String {
             stringify!(EWKBGeometry).to_owned()
         }
-    
+
         fn array_type() -> sea_query::ArrayType {
             ArrayType::Bytes
         }
-    
+
         fn column_type() -> sea_orm::ColumnType {
             ColumnType::Bit(None)
         }
     }
-        
 }
 
 impl TryFrom<&[u8]> for EWKBGeometry {
@@ -133,7 +153,6 @@ impl DerefMut for EWKBGeometry {
     }
 }
 
-
 impl EWKBGeometry {
     /// Encode une géométrie au format EWKB dans le flux de sortie.
     ///
@@ -148,10 +167,10 @@ impl EWKBGeometry {
         stream: &mut W,
     ) -> Result<(), std::io::Error>
     where
-        Endianess: From<E>,
+        Endianess: From<PhantomData<E>>,
     {
         // Write endianness.
-        stream.write_u8(Endianess::from(E::default()).into())?;
+        stream.write_u8(Endianess::from(PhantomData::<E>).into())?;
 
         // Write the EWKB type
         self.kind().encode_ewkb::<E, _>(stream)?;
@@ -216,7 +235,6 @@ impl EWKBGeometry {
         Ok(EWKBGeometry(geometry))
     }
 }
-
 
 impl GeometryKind {
     pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
@@ -486,14 +504,14 @@ pub enum Endianess {
     LittleEndian,
 }
 
-impl From<BigEndian> for Endianess {
-    fn from(_value: BigEndian) -> Self {
+impl From<PhantomData<BigEndian>> for Endianess {
+    fn from(_value: PhantomData<BigEndian>) -> Self {
         Endianess::BigEndian
     }
 }
 
-impl From<LittleEndian> for Endianess {
-    fn from(_value: LittleEndian) -> Self {
+impl From<PhantomData<LittleEndian>> for Endianess {
+    fn from(_value: PhantomData<LittleEndian>) -> Self {
         Endianess::LittleEndian
     }
 }
@@ -504,5 +522,28 @@ impl From<Endianess> for u8 {
             Endianess::BigEndian => BIG_ENDIAN,
             Endianess::LittleEndian => LITTLE_ENDIAN,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    pub fn test_codec() {
+        let expected = EWKBGeometry::from(Geometry::from(PointS::new([10.0, 20.0])));
+
+        let mut binary = Vec::<u8>::new();
+
+        expected
+            .clone()
+            .encode_to_stream(&mut binary)
+            .expect("cannot encode to stream");
+
+        let mut stream = Cursor::new(binary);
+        let value =
+            EWKBGeometry::decode_from_stream(&mut stream).expect("cannot decode from stream");
+
+        assert_eq!(value, expected)
     }
 }
