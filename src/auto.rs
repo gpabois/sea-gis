@@ -1,8 +1,24 @@
+use std::ops::{Deref, DerefMut};
+
 use crate::types;
 
 /// Objet intermédiaire détectant le type de base de données
 /// pour appliquer le codec adéquat.
 pub struct AutoGeometry(types::Geometry);
+
+impl Deref for AutoGeometry {
+    type Target = types::Geometry;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for AutoGeometry {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 impl From<types::Geometry> for AutoGeometry {
     fn from(value: types::Geometry) -> Self {

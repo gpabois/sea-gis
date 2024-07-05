@@ -4,6 +4,7 @@ pub mod types;
 pub mod auto;
 pub mod ewkb;
 pub mod spatialite;
+pub mod geo_json;
 
 pub mod error;
 pub mod functions;

@@ -7,7 +7,10 @@ edition = "2021"
 
 [dependencies]
 byteorder = "1.5.0"
+paste = "1.0.15"
 sea-orm = "0.12.15"
 sea-query = "0.30.7"
+serde = "1.0.203"
+serde_json = "1.0.120"
 sqlx = { version = "0.7.4", features = ["sqlite", "postgres", "macros"] }
 tokio = { version = "1.38.0", features = ["full"] }

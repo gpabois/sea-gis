@@ -1,4 +1,6 @@
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian, ReadBytesExt, WriteBytesExt};
+use paste::paste;
+
 use std::{
     io::{Cursor, Read, Write},
     marker::PhantomData,
@@ -6,12 +8,15 @@ use std::{
 };
 
 use crate::types::{
-    LineString, LineStringS, LineStringZ, MultiLineString, MultiLineStringS, MultiLineStringZ,
-    MultiPoint, MultiPointS, MultiPointZ, MultiPolygon, MultiPolygonS, MultiPolygonZ, PointS,
-    PointZ, Polygon, PolygonS, PolygonZ, Vector, VectorArray, VectorMatrix, VectorTensor, MBR,
+    Geometry, GeometryKind,
+    GenLineString, GenMultiLineString, GenMultiPoint, GenMultiPolygon, GenPoint, GenPolygon, 
+    LineString, LineStringZ, 
+    MultiLineString, MultiLineStringZ, 
+    MultiPoint, MultiPointZ, 
+    MultiPolygon, MultiPolygonZ, 
+    Point, PointZ, 
+    Polygon, PolygonZ, Vector, VectorArray, VectorMatrix, VectorTensor, MBR
 };
-
-use super::types::{Geometry, GeometryKind, Point};
 
 const BIG_ENDIAN: u8 = 0;
 const LITTLE_ENDIAN: u8 = 1;
@@ -19,6 +24,30 @@ const LITTLE_ENDIAN: u8 = 1;
 #[derive(Debug, Clone, PartialEq)]
 /// Objet intermédiaire pour encoder/décoder une géométrie au format natif de SpatiaLite.
 pub struct SpatiaLiteGeometry(Geometry);
+
+impl SpatiaLiteGeometry {
+    pub fn new<G: Into<Geometry>>(args: G) -> Self {
+        Self(args.into())
+    }
+
+    pub fn into_geometry(self) -> Geometry {
+        self.0
+    }
+}
+
+impl Deref for SpatiaLiteGeometry {
+    type Target = Geometry;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for SpatiaLiteGeometry {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 impl From<Geometry> for SpatiaLiteGeometry {
     fn from(value: Geometry) -> Self {
@@ -31,6 +60,57 @@ impl From<SpatiaLiteGeometry> for Geometry {
         value.0
     }
 }
+
+macro_rules!  impl_geometry_cls {
+    ($geometry_type:ident) => {
+        paste! {
+            #[derive(Debug, Clone, PartialEq)]
+            pub struct [<SpatiaLite $geometry_type>] ($geometry_type);
+
+            impl From<$geometry_type> for [<SpatiaLite $geometry_type>] {
+                fn from(value: $geometry_type) -> Self {
+                    Self(value)
+                }
+            }
+
+            impl From<[<SpatiaLite $geometry_type>]> for $geometry_type  {
+                fn from(value: [<SpatiaLite $geometry_type>]) -> Self {
+                    value.0
+                }
+            }
+
+            impl Deref for [<SpatiaLite $geometry_type>] {
+                type Target = $geometry_type;
+
+                fn deref(&self) -> &Self::Target {
+                    &self.0
+                }
+            }
+
+
+            impl DerefMut for [<SpatiaLite $geometry_type>] {
+                fn deref_mut(&mut self) -> &mut Self::Target {
+                    &mut self.0
+                }
+            }
+        }
+
+    };
+}
+
+impl_geometry_cls!(Point);
+impl_geometry_cls!(MultiPoint);
+impl_geometry_cls!(LineString);
+impl_geometry_cls!(MultiLineString);
+impl_geometry_cls!(Polygon);
+impl_geometry_cls!(MultiPolygon);
+
+impl_geometry_cls!(PointZ);
+impl_geometry_cls!(MultiPointZ);
+impl_geometry_cls!(LineStringZ);
+impl_geometry_cls!(MultiLineStringZ);
+impl_geometry_cls!(PolygonZ);
+impl_geometry_cls!(MultiPolygonZ);
 
 /// Implémente l'encodage / décodage pour Sea ORM
 mod sea_orm {
@@ -82,8 +162,72 @@ mod sea_orm {
 
 /// Implémente l'encodage / décodage depuis sqlx
 mod sqlx {
-    use super::SpatiaLiteGeometry;
-    use sqlx::{Database, Decode, Encode};
+    use super::*;
+    use ::sqlx::{Database, Decode, Encode, Type};
+
+    macro_rules!  impl_geometry_codec {
+        ($geometry_type:ident) => {
+            paste! {
+                impl<'r, DB> Type<DB> for [<SpatiaLite $geometry_type>] 
+                where DB: Database, SpatiaLiteGeometry: Type<DB>,
+                {
+                    fn type_info() -> <DB as Database>::TypeInfo {
+                        SpatiaLiteGeometry::type_info()
+                    }
+                }
+
+                impl<'r, DB> Decode<'r, DB> for [<SpatiaLite $geometry_type>] 
+                where
+                    DB: Database,
+                    SpatiaLiteGeometry: Decode<'r, DB>,
+                {
+                    fn decode(
+                        value: <DB as ::sqlx::database::HasValueRef<'r>>::ValueRef,
+                    ) -> Result<Self, ::sqlx::error::BoxDynError> {
+                        let geom = SpatiaLiteGeometry::decode(value)?.0;
+                        Ok(Self(geom.try_into()?))
+                    }
+                }         
+
+                impl<'q, DB> Encode<'q, DB> for [<SpatiaLite $geometry_type>] 
+                where
+                    DB: Database,
+                    SpatiaLiteGeometry: Encode<'q, DB>,
+                {
+                    fn encode_by_ref(
+                        &self,
+                        buf: &mut <DB as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
+                    ) -> ::sqlx::encode::IsNull {
+                        SpatiaLiteGeometry(self.0.clone().into()).encode_by_ref(buf)
+                    }
+                }  
+            }
+    
+        };
+    }
+
+    impl_geometry_codec!(Point);
+    impl_geometry_codec!(MultiPoint);
+    impl_geometry_codec!(LineString);
+    impl_geometry_codec!(MultiLineString);
+    impl_geometry_codec!(Polygon);
+    impl_geometry_codec!(MultiPolygon);
+
+    impl_geometry_codec!(PointZ);
+    impl_geometry_codec!(MultiPointZ);
+    impl_geometry_codec!(LineStringZ);
+    impl_geometry_codec!(MultiLineStringZ);
+    impl_geometry_codec!(PolygonZ);
+    impl_geometry_codec!(MultiPolygonZ);
+
+
+    impl<'r, DB> Type<DB> for SpatiaLiteGeometry 
+    where DB: Database, &'r [u8]: Type<DB>,
+    {
+        fn type_info() -> <DB as Database>::TypeInfo {
+            <&[u8]>::type_info()
+        }
+    }
 
     impl<'r, DB> Decode<'r, DB> for SpatiaLiteGeometry
     where
@@ -91,8 +235,8 @@ mod sqlx {
         &'r [u8]: Decode<'r, DB>,
     {
         fn decode(
-            value: <DB as sqlx::database::HasValueRef<'r>>::ValueRef,
-        ) -> Result<Self, sqlx::error::BoxDynError> {
+            value: <DB as ::sqlx::database::HasValueRef<'r>>::ValueRef,
+        ) -> Result<Self, ::sqlx::error::BoxDynError> {
             let encoded = <&'r [u8] as Decode<DB>>::decode(value)?;
             let decoded = Self::try_from(encoded)?;
             Ok(decoded)
@@ -106,8 +250,8 @@ mod sqlx {
     {
         fn encode_by_ref(
             &self,
-            buf: &mut <DB as sqlx::database::HasArguments<'q>>::ArgumentBuffer,
-        ) -> sqlx::encode::IsNull {
+            buf: &mut <DB as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
+        ) -> ::sqlx::encode::IsNull {
             let mut encoded = Vec::<u8>::new();
             self.clone()
                 .encode_to_stream(&mut encoded)
@@ -117,8 +261,8 @@ mod sqlx {
 
         fn encode(
             self,
-            buf: &mut <DB as sqlx::database::HasArguments<'q>>::ArgumentBuffer,
-        ) -> sqlx::encode::IsNull
+            buf: &mut <DB as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
+        ) -> ::sqlx::encode::IsNull
         where
             Self: Sized,
         {
@@ -136,20 +280,6 @@ impl TryFrom<&[u8]> for SpatiaLiteGeometry {
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         let mut cursor = Cursor::new(value);
         Self::decode_from_stream(&mut cursor)
-    }
-}
-
-impl Deref for SpatiaLiteGeometry {
-    type Target = Geometry;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for SpatiaLiteGeometry {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
 
@@ -178,12 +308,12 @@ impl SpatiaLiteGeometry {
         self.kind().encode_spatialite::<E, _>(stream)?;
 
         match self.0 {
-            Geometry::PointS(a) => a.encode_spatialite::<E, _>(stream)?,
-            Geometry::LineStringS(a) => a.encode_spatialite::<E, _>(stream)?,
-            Geometry::PolygonS(a) => a.encode_spatialite::<E, _>(stream)?,
-            Geometry::MultiPointS(a) => a.encode_spatialite::<E, _>(stream)?,
-            Geometry::MultiLineStringS(a) => a.encode_spatialite::<E, _>(stream)?,
-            Geometry::MultiPolygonS(a) => a.encode_spatialite::<E, _>(stream)?,
+            Geometry::Point(a) => a.encode_spatialite::<E, _>(stream)?,
+            Geometry::LineString(a) => a.encode_spatialite::<E, _>(stream)?,
+            Geometry::Polygon(a) => a.encode_spatialite::<E, _>(stream)?,
+            Geometry::MultiPoint(a) => a.encode_spatialite::<E, _>(stream)?,
+            Geometry::MultiLineString(a) => a.encode_spatialite::<E, _>(stream)?,
+            Geometry::MultiPolygon(a) => a.encode_spatialite::<E, _>(stream)?,
             Geometry::PointZ(a) => a.encode_spatialite::<E, _>(stream)?,
             Geometry::LineStringZ(a) => a.encode_spatialite::<E, _>(stream)?,
             Geometry::PolygonZ(a) => a.encode_spatialite::<E, _>(stream)?,
@@ -224,15 +354,15 @@ impl SpatiaLiteGeometry {
         let kind = GeometryKind::decode_spatialite::<E, _>(stream)?;
 
         let mut geometry: Geometry = match kind {
-            GeometryKind::PointS => PointS::decode_spatialite::<E, _>(stream)?.into(),
-            GeometryKind::LineStringS => LineStringS::decode_spatialite::<E, _>(stream)?.into(),
-            GeometryKind::PolygonS => PolygonS::decode_spatialite::<E, _>(stream)?.into(),
-            GeometryKind::MultiPointS => MultiPointS::decode_spatialite::<E, _>(stream)?.into(),
-            GeometryKind::MultiLineStringS => {
-                MultiLineStringS::decode_spatialite::<E, _>(stream)?.into()
+            GeometryKind::Point => Point::decode_spatialite::<E, _>(stream)?.into(),
+            GeometryKind::LineString => LineString::decode_spatialite::<E, _>(stream)?.into(),
+            GeometryKind::Polygon => Polygon::decode_spatialite::<E, _>(stream)?.into(),
+            GeometryKind::MultiPoint => MultiPoint::decode_spatialite::<E, _>(stream)?.into(),
+            GeometryKind::MultiLineString => {
+                MultiLineString::decode_spatialite::<E, _>(stream)?.into()
             }
-            GeometryKind::MultiPolygonS => MultiPolygonS::decode_spatialite::<E, _>(stream)?.into(),
-            GeometryKind::GeometryCollectionS => todo!(),
+            GeometryKind::MultiPolygon => MultiPolygon::decode_spatialite::<E, _>(stream)?.into(),
+            GeometryKind::GeometryCollection => todo!(),
             GeometryKind::PointZ => PointZ::decode_spatialite::<E, _>(stream)?.into(),
             GeometryKind::LineStringZ => LineStringZ::decode_spatialite::<E, _>(stream)?.into(),
             GeometryKind::PolygonZ => PolygonZ::decode_spatialite::<E, _>(stream)?.into(),
@@ -259,13 +389,13 @@ impl GeometryKind {
         stream: &mut W,
     ) -> Result<(), std::io::Error> {
         let encoded = match self {
-            GeometryKind::PointS => 1,
-            GeometryKind::LineStringS => 2,
-            GeometryKind::PolygonS => 3,
-            GeometryKind::MultiPointS => 4,
-            GeometryKind::MultiLineStringS => 5,
-            GeometryKind::MultiPolygonS => 6,
-            GeometryKind::GeometryCollectionS => 7,
+            GeometryKind::Point => 1,
+            GeometryKind::LineString => 2,
+            GeometryKind::Polygon => 3,
+            GeometryKind::MultiPoint => 4,
+            GeometryKind::MultiLineString => 5,
+            GeometryKind::MultiPolygon => 6,
+            GeometryKind::GeometryCollection => 7,
             GeometryKind::PointZ => 1001,
             GeometryKind::LineStringZ => 1002,
             GeometryKind::PolygonZ => 1003,
@@ -281,13 +411,13 @@ impl GeometryKind {
         stream: &mut R,
     ) -> Result<Self, std::io::Error> {
         Ok(match stream.read_u32::<E>()? {
-            1 => GeometryKind::PointS,
-            2 => GeometryKind::LineStringS,
-            3 => GeometryKind::PolygonS,
-            4 => GeometryKind::MultiPointS,
-            5 => GeometryKind::MultiLineStringS,
-            6 => GeometryKind::MultiPolygonS,
-            7 => GeometryKind::GeometryCollectionS,
+            1 => GeometryKind::Point,
+            2 => GeometryKind::LineString,
+            3 => GeometryKind::Polygon,
+            4 => GeometryKind::MultiPoint,
+            5 => GeometryKind::MultiLineString,
+            6 => GeometryKind::MultiPolygon,
+            7 => GeometryKind::GeometryCollection,
 
             1001 => GeometryKind::PointZ,
             1002 => GeometryKind::LineStringZ,
@@ -336,7 +466,7 @@ impl MBR<f64> {
     }
 }
 
-impl<const N: usize> Point<N, f64> {
+impl<const N: usize> GenPoint<N, f64> {
     /// Encode un point dans un flux binaire.
     pub(self) fn encode_spatialite<E: ByteOrder, W: Write>(
         self,
@@ -354,7 +484,7 @@ impl<const N: usize> Point<N, f64> {
     }
 }
 
-impl<const N: usize> MultiPoint<N, f64> {
+impl<const N: usize> GenMultiPoint<N, f64> {
     /// Encode un ensemble de points dans un flux binaire
     pub(self) fn encode_spatialite<E: ByteOrder, W: Write>(
         self,
@@ -372,7 +502,7 @@ impl<const N: usize> MultiPoint<N, f64> {
     }
 }
 
-impl<const N: usize> LineString<N, f64> {
+impl<const N: usize> GenLineString<N, f64> {
     /// Encode un ensemble de points dans un flux binaire
     pub(self) fn encode_spatialite<E: ByteOrder, W: Write>(
         self,
@@ -390,7 +520,7 @@ impl<const N: usize> LineString<N, f64> {
     }
 }
 
-impl<const N: usize> MultiLineString<N, f64> {
+impl<const N: usize> GenMultiLineString<N, f64> {
     pub(self) fn encode_spatialite<E: ByteOrder, W: Write>(
         self,
         stream: &mut W,
@@ -406,7 +536,7 @@ impl<const N: usize> MultiLineString<N, f64> {
     }
 }
 
-impl<const N: usize> Polygon<N, f64> {
+impl<const N: usize> GenPolygon<N, f64> {
     pub(self) fn encode_spatialite<E: ByteOrder, W: Write>(
         self,
         stream: &mut W,
@@ -422,7 +552,7 @@ impl<const N: usize> Polygon<N, f64> {
     }
 }
 
-impl<const N: usize> MultiPolygon<N, f64> {
+impl<const N: usize> GenMultiPolygon<N, f64> {
     pub(self) fn encode_spatialite<E: ByteOrder, W: Write>(
         self,
         stream: &mut W,
@@ -584,8 +714,8 @@ mod tests {
     use super::*;
 
     #[test]
-    pub fn test_codec() {
-        let expected = SpatiaLiteGeometry::from(Geometry::from(PointS::new([10.0, 20.0])));
+    pub fn test_isomorphism() {
+        let expected = SpatiaLiteGeometry::new(Point::new([10.0, 20.0]));
 
         let mut binary = Vec::<u8>::new();
 
