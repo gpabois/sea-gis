@@ -1,6 +1,5 @@
 use super::{VectorMatrix, MBR};
 
-
 pub type PolygonCoordinates<const N: usize, U> = VectorMatrix<N, U>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,3 +40,4 @@ where
         }
     }
 }
+

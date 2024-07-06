@@ -3,12 +3,12 @@ use std::ops::{Deref, DerefMut};
 use super::{Vector, MBR};
 
 /// Type représentant les coordonnées d'un point.
-pub type PointCoordinates<const N: usize, U> = Vector<N,U>;
+pub type PointCoordinates<const N: usize, U> = Vector<N, U>;
 
 /// Un point dans un espace n-d.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Point<const N: usize, U> {
-    pub coordinates: PointCoordinates<N,U>,
+    pub coordinates: PointCoordinates<N, U>,
     pub srid: u32,
 }
 
@@ -52,3 +52,4 @@ impl<const N: usize, U> DerefMut for Point<N, U> {
         self.coordinates.deref_mut()
     }
 }
+

@@ -3,18 +3,21 @@
 //!
 //! Voir [self::EWKBGeometry]
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian, ReadBytesExt, WriteBytesExt};
-
+use paste::paste;
 use std::{
     io::{Cursor, Read, Write},
     marker::PhantomData,
     ops::{Deref, DerefMut},
 };
 
-use crate::types::{GenLineString, GenMultiLineString, GenMultiPoint, GenMultiPolygon, GenPoint, GenPolygon, LineString, LineStringZ, MultiLineString, MultiLineStringZ, MultiPoint, MultiPointZ, MultiPolygon, MultiPolygonZ, Point, PointZ, Polygon, PolygonZ, Vector, VectorArray, VectorMatrix, VectorTensor};
-
-use super::types::{
-    Geometry, GeometryKind
+use crate::types::{
+    GenLineString, GenMultiLineString, GenMultiPoint, GenMultiPolygon, GenPoint, GenPolygon,
+    LineString, LineStringZ, MultiLineString, MultiLineStringZ, MultiPoint, MultiPointZ,
+    MultiPolygon, MultiPolygonZ, Point, PointZ, Polygon, PolygonZ, Vector, VectorArray,
+    VectorMatrix, VectorTensor,
 };
+
+use super::types::{Geometry, GeometryKind};
 
 /// Objet intermédiaire pour encoder/decoder
 /// au format EWKB toute géométrie.
@@ -197,6 +200,8 @@ impl GeometryKind {
     }
 }
 
+impl_geometry_proxies!(EWKB);
+
 const BIG_ENDIAN: u8 = 0;
 const LITTLE_ENDIAN: u8 = 1;
 
@@ -336,10 +341,10 @@ impl<const N: usize> VectorArray<N, f64> {
     pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(
         stream: &mut R,
     ) -> Result<Self, std::io::Error> {
-        let nb_Point: u32 = stream.read_u32::<E>()?;
-        let mut coordinates = Vec::<Vector<N, f64>>::with_capacity(nb_Point as usize);
+        let nb_points: u32 = stream.read_u32::<E>()?;
+        let mut coordinates = Vec::<Vector<N, f64>>::with_capacity(nb_points as usize);
 
-        for _ in 0..nb_Point {
+        for _ in 0..nb_points {
             coordinates.push(Vector::decode_ewkb::<E, _>(stream)?);
         }
 
@@ -366,10 +371,10 @@ impl<const N: usize> VectorMatrix<N, f64> {
     pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(
         stream: &mut R,
     ) -> Result<Self, std::io::Error> {
-        let nb_Point: u32 = stream.read_u32::<E>()?;
-        let mut coordinates = Vec::<VectorArray<N, f64>>::with_capacity(nb_Point as usize);
+        let nb_points: u32 = stream.read_u32::<E>()?;
+        let mut coordinates = Vec::<VectorArray<N, f64>>::with_capacity(nb_points as usize);
 
-        for _ in 0..nb_Point {
+        for _ in 0..nb_points {
             coordinates.push(VectorArray::<N, f64>::decode_ewkb::<E, _>(stream)?);
         }
 
@@ -395,10 +400,10 @@ impl<const N: usize> VectorTensor<N, f64> {
     pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(
         stream: &mut R,
     ) -> Result<Self, std::io::Error> {
-        let nb_Point: u32 = stream.read_u32::<E>()?;
-        let mut coordinates = Vec::<VectorMatrix<N, f64>>::with_capacity(nb_Point as usize);
+        let nb_points: u32 = stream.read_u32::<E>()?;
+        let mut coordinates = Vec::<VectorMatrix<N, f64>>::with_capacity(nb_points as usize);
 
-        for _ in 0..nb_Point {
+        for _ in 0..nb_points {
             coordinates.push(VectorMatrix::<N, f64>::decode_ewkb::<E, _>(stream)?);
         }
 
@@ -435,8 +440,18 @@ impl From<Endianess> for u8 {
 
 /// Implémente l'encodage / décodage depuis sqlx
 mod sqlx {
-    use super::EWKBGeometry;
-    use sqlx::{Database, Decode, Encode};
+    use super::*;
+    use ::sqlx::{Database, Decode, Encode, Type};
+
+    impl<'r, DB> Type<DB> for EWKBGeometry
+    where
+        DB: Database,
+        &'r [u8]: Type<DB>,
+    {
+        fn type_info() -> <DB as Database>::TypeInfo {
+            <&[u8]>::type_info()
+        }
+    }
 
     impl<'r, DB> Decode<'r, DB> for EWKBGeometry
     where
@@ -444,8 +459,8 @@ mod sqlx {
         &'r [u8]: Decode<'r, DB>,
     {
         fn decode(
-            value: <DB as sqlx::database::HasValueRef<'r>>::ValueRef,
-        ) -> Result<Self, sqlx::error::BoxDynError> {
+            value: <DB as ::sqlx::database::HasValueRef<'r>>::ValueRef,
+        ) -> Result<Self, ::sqlx::error::BoxDynError> {
             let encoded = <&'r [u8] as Decode<DB>>::decode(value)?;
             let decoded = Self::try_from(encoded)?;
             Ok(decoded)
@@ -459,8 +474,8 @@ mod sqlx {
     {
         fn encode_by_ref(
             &self,
-            buf: &mut <DB as sqlx::database::HasArguments<'q>>::ArgumentBuffer,
-        ) -> sqlx::encode::IsNull {
+            buf: &mut <DB as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
+        ) -> ::sqlx::encode::IsNull {
             let mut encoded = Vec::<u8>::new();
             self.clone()
                 .encode_to_stream(&mut encoded)
@@ -470,8 +485,8 @@ mod sqlx {
 
         fn encode(
             self,
-            buf: &mut <DB as sqlx::database::HasArguments<'q>>::ArgumentBuffer,
-        ) -> sqlx::encode::IsNull
+            buf: &mut <DB as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
+        ) -> ::sqlx::encode::IsNull
         where
             Self: Sized,
         {
@@ -481,6 +496,8 @@ mod sqlx {
             encoded.encode(buf)
         }
     }
+
+    impl_geometry_sqlx_codecs!(EWKB);
 }
 
 /// Implémente l'encodage / décodage pour Sea ORM

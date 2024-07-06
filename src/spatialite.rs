@@ -8,14 +8,10 @@ use std::{
 };
 
 use crate::types::{
-    Geometry, GeometryKind,
-    GenLineString, GenMultiLineString, GenMultiPoint, GenMultiPolygon, GenPoint, GenPolygon, 
-    LineString, LineStringZ, 
-    MultiLineString, MultiLineStringZ, 
-    MultiPoint, MultiPointZ, 
-    MultiPolygon, MultiPolygonZ, 
-    Point, PointZ, 
-    Polygon, PolygonZ, Vector, VectorArray, VectorMatrix, VectorTensor, MBR
+    GenLineString, GenMultiLineString, GenMultiPoint, GenMultiPolygon, GenPoint, GenPolygon,
+    Geometry, GeometryKind, LineString, LineStringZ, MultiLineString, MultiLineStringZ, MultiPoint,
+    MultiPointZ, MultiPolygon, MultiPolygonZ, Point, PointZ, Polygon, PolygonZ, Vector,
+    VectorArray, VectorMatrix, VectorTensor, MBR,
 };
 
 const BIG_ENDIAN: u8 = 0;
@@ -61,56 +57,7 @@ impl From<SpatiaLiteGeometry> for Geometry {
     }
 }
 
-macro_rules!  impl_geometry_cls {
-    ($geometry_type:ident) => {
-        paste! {
-            #[derive(Debug, Clone, PartialEq)]
-            pub struct [<SpatiaLite $geometry_type>] ($geometry_type);
-
-            impl From<$geometry_type> for [<SpatiaLite $geometry_type>] {
-                fn from(value: $geometry_type) -> Self {
-                    Self(value)
-                }
-            }
-
-            impl From<[<SpatiaLite $geometry_type>]> for $geometry_type  {
-                fn from(value: [<SpatiaLite $geometry_type>]) -> Self {
-                    value.0
-                }
-            }
-
-            impl Deref for [<SpatiaLite $geometry_type>] {
-                type Target = $geometry_type;
-
-                fn deref(&self) -> &Self::Target {
-                    &self.0
-                }
-            }
-
-
-            impl DerefMut for [<SpatiaLite $geometry_type>] {
-                fn deref_mut(&mut self) -> &mut Self::Target {
-                    &mut self.0
-                }
-            }
-        }
-
-    };
-}
-
-impl_geometry_cls!(Point);
-impl_geometry_cls!(MultiPoint);
-impl_geometry_cls!(LineString);
-impl_geometry_cls!(MultiLineString);
-impl_geometry_cls!(Polygon);
-impl_geometry_cls!(MultiPolygon);
-
-impl_geometry_cls!(PointZ);
-impl_geometry_cls!(MultiPointZ);
-impl_geometry_cls!(LineStringZ);
-impl_geometry_cls!(MultiLineStringZ);
-impl_geometry_cls!(PolygonZ);
-impl_geometry_cls!(MultiPolygonZ);
+impl_geometry_proxies!(SpatiaLite);
 
 /// Implémente l'encodage / décodage pour Sea ORM
 mod sea_orm {
@@ -165,64 +112,10 @@ mod sqlx {
     use super::*;
     use ::sqlx::{Database, Decode, Encode, Type};
 
-    macro_rules!  impl_geometry_codec {
-        ($geometry_type:ident) => {
-            paste! {
-                impl<'r, DB> Type<DB> for [<SpatiaLite $geometry_type>] 
-                where DB: Database, SpatiaLiteGeometry: Type<DB>,
-                {
-                    fn type_info() -> <DB as Database>::TypeInfo {
-                        SpatiaLiteGeometry::type_info()
-                    }
-                }
-
-                impl<'r, DB> Decode<'r, DB> for [<SpatiaLite $geometry_type>] 
-                where
-                    DB: Database,
-                    SpatiaLiteGeometry: Decode<'r, DB>,
-                {
-                    fn decode(
-                        value: <DB as ::sqlx::database::HasValueRef<'r>>::ValueRef,
-                    ) -> Result<Self, ::sqlx::error::BoxDynError> {
-                        let geom = SpatiaLiteGeometry::decode(value)?.0;
-                        Ok(Self(geom.try_into()?))
-                    }
-                }         
-
-                impl<'q, DB> Encode<'q, DB> for [<SpatiaLite $geometry_type>] 
-                where
-                    DB: Database,
-                    SpatiaLiteGeometry: Encode<'q, DB>,
-                {
-                    fn encode_by_ref(
-                        &self,
-                        buf: &mut <DB as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
-                    ) -> ::sqlx::encode::IsNull {
-                        SpatiaLiteGeometry(self.0.clone().into()).encode_by_ref(buf)
-                    }
-                }  
-            }
-    
-        };
-    }
-
-    impl_geometry_codec!(Point);
-    impl_geometry_codec!(MultiPoint);
-    impl_geometry_codec!(LineString);
-    impl_geometry_codec!(MultiLineString);
-    impl_geometry_codec!(Polygon);
-    impl_geometry_codec!(MultiPolygon);
-
-    impl_geometry_codec!(PointZ);
-    impl_geometry_codec!(MultiPointZ);
-    impl_geometry_codec!(LineStringZ);
-    impl_geometry_codec!(MultiLineStringZ);
-    impl_geometry_codec!(PolygonZ);
-    impl_geometry_codec!(MultiPolygonZ);
-
-
-    impl<'r, DB> Type<DB> for SpatiaLiteGeometry 
-    where DB: Database, &'r [u8]: Type<DB>,
+    impl<'r, DB> Type<DB> for SpatiaLiteGeometry
+    where
+        DB: Database,
+        &'r [u8]: Type<DB>,
     {
         fn type_info() -> <DB as Database>::TypeInfo {
             <&[u8]>::type_info()
@@ -272,6 +165,8 @@ mod sqlx {
             encoded.encode(buf)
         }
     }
+
+    impl_geometry_sqlx_codecs!(SpatiaLite);
 }
 
 impl TryFrom<&[u8]> for SpatiaLiteGeometry {

@@ -32,15 +32,27 @@ impl From<AutoGeometry> for types::Geometry {
     }
 }
 
+impl_geometry_proxies!(Auto);
+
 mod sqlx {
     use std::marker::PhantomData;
 
-    use ::sqlx::{Database, Decode, Encode};
-    use sqlx::{Postgres, Sqlite};
+    use ::sqlx::{Database, Decode, Encode, Type};
+    use ::sqlx::{Postgres, Sqlite};
 
-    use crate::{ewkb::EWKBGeometry, spatialite::SpatiaLiteGeometry, types};
+    use crate::{postgis::PgGeometry, spatialite::SpatiaLiteGeometry, types};
 
-    use super::AutoGeometry;
+    use super::*;
+
+    impl<'r, DB> Type<DB> for AutoGeometry
+    where
+        DB: Database,
+        &'r [u8]: Type<DB>,
+    {
+        fn type_info() -> <DB as Database>::TypeInfo {
+            <&[u8]>::type_info()
+        }
+    }
 
     impl<'q, DB> Encode<'q, DB> for AutoGeometry
     where
@@ -50,10 +62,10 @@ mod sqlx {
     {
         fn encode_by_ref(
             &self,
-            buf: &mut <DB as sqlx::database::HasArguments<'q>>::ArgumentBuffer,
-        ) -> sqlx::encode::IsNull {
+            buf: &mut <DB as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
+        ) -> ::sqlx::encode::IsNull {
             match DatabaseKind::new::<DB>() {
-                DatabaseKind::Postgres => EWKBGeometry::from(self.0.clone()).encode_by_ref(buf),
+                DatabaseKind::Postgres => PgGeometry::from(self.0.clone()).encode_by_ref(buf),
                 DatabaseKind::SqlLite => {
                     SpatiaLiteGeometry::from(self.0.clone()).encode_by_ref(buf)
                 }
@@ -68,10 +80,10 @@ mod sqlx {
         &'r [u8]: Decode<'r, DB>,
     {
         fn decode(
-            value: <DB as sqlx::database::HasValueRef<'r>>::ValueRef,
-        ) -> Result<Self, sqlx::error::BoxDynError> {
+            value: <DB as ::sqlx::database::HasValueRef<'r>>::ValueRef,
+        ) -> Result<Self, ::sqlx::error::BoxDynError> {
             match DatabaseKind::new::<DB>() {
-                DatabaseKind::Postgres => EWKBGeometry::decode(value)
+                DatabaseKind::Postgres => PgGeometry::decode(value)
                     .map(types::Geometry::from)
                     .map(Self::from),
                 DatabaseKind::SqlLite => SpatiaLiteGeometry::decode(value)
@@ -80,6 +92,8 @@ mod sqlx {
             }
         }
     }
+
+    impl_geometry_sqlx_codecs!(Auto);
 
     enum DatabaseKind {
         Postgres,
