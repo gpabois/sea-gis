@@ -1,7 +1,7 @@
 use std::{error::Error, str::FromStr};
 
 use sql_gis::{
-    sql_types::{AutoGeometry, AutoPoint, SpatiaLitePoint},
+    sql_types::{AutoPoint, SpatiaLiteGeometry, SpatiaLitePoint},
     types::Point,
 };
 use sqlx::{sqlite::SqliteConnectOptions, Connection, SqliteConnection};
@@ -26,19 +26,19 @@ async fn setup() -> Result<SqliteConnection, Box<dyn Error>> {
     Ok(conn)
 }
 
-#[tokio::test]
+#[sqlx::test]
 /// Teste l'encodage/décodage d'une géométrie (point) depuis SpatiaLite
 async fn test_spatialite_isomorphism() -> Result<(), Box<dyn Error>> {
     let mut conn = setup().await.expect("cannot setup test environment");
 
-    let expected = AutoPoint::from(Point::new([10.1, 20.2]));
+    let expected = SpatiaLitePoint::from(Point::new([10.1, 20.2]));
 
     let (id,): (u32,) = sqlx::query_as("INSERT INTO gis_points (pt) VALUES (?) RETURNING id")
         .bind(&expected)
         .fetch_one(&mut conn)
         .await?;
 
-    let (value,): (AutoPoint,) = sqlx::query_as("SELECT pt FROM gis_points WHERE id = ?")
+    let (value,): (SpatiaLitePoint,) = sqlx::query_as("SELECT pt FROM gis_points WHERE id = ?")
         .bind(id)
         .fetch_one(&mut conn)
         .await?;
@@ -48,7 +48,7 @@ async fn test_spatialite_isomorphism() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[tokio::test]
+#[sqlx::test]
 /// Teste l'insertion de deux points dans une table, et la sélection d'un point qui se trouve dans
 /// une surface donnée (via ST_Within)
 ///

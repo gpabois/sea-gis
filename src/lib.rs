@@ -28,7 +28,7 @@ macro_rules! impl_geometry_proxy {
                 }
             }
 
-            impl Deref for [<$ns $geometry_type>] {
+            impl std::ops::Deref for [<$ns $geometry_type>] {
                 type Target = crate::types::$geometry_type;
 
                 fn deref(&self) -> &Self::Target {
@@ -37,7 +37,7 @@ macro_rules! impl_geometry_proxy {
             }
 
 
-            impl DerefMut for [<$ns $geometry_type>] {
+            impl ::std::ops::DerefMut for [<$ns $geometry_type>] {
                 fn deref_mut(&mut self) -> &mut Self::Target {
                     &mut self.0
                 }
@@ -70,7 +70,7 @@ macro_rules! impl_geometry_sqlx_codec {
             impl<'r, DB> ::sqlx::Type<DB> for [<$ns $geometry_type>]
             where DB: ::sqlx::Database, [<$ns Geometry>]: ::sqlx::Type<DB>,
             {
-                fn type_info() -> <DB as Database>::TypeInfo {
+                fn type_info() -> <DB as ::sqlx::Database>::TypeInfo {
                     [<$ns Geometry>]::type_info()
                 }
             }

@@ -35,6 +35,7 @@ impl From<AutoGeometry> for types::Geometry {
 impl_geometry_proxies!(Auto);
 
 mod sqlx {
+    use std::fmt::write;
     use std::marker::PhantomData;
 
     use ::sqlx::{Database, Decode, Encode, Type};
@@ -54,59 +55,30 @@ mod sqlx {
         }
     }
 
-    impl<'q, DB> Encode<'q, DB> for AutoGeometry
-    where
-        DB: Database,
-        DatabaseKind: From<PhantomData<DB>>,
-        Vec<u8>: Encode<'q, DB>,
-    {
+    impl<'q> Encode<'q, Postgres> for AutoGeometry {
         fn encode_by_ref(
             &self,
-            buf: &mut <DB as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
+            buf: &mut <Postgres as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
         ) -> ::sqlx::encode::IsNull {
-            match DatabaseKind::new::<DB>() {
-                DatabaseKind::Postgres => PgGeometry::from(self.0.clone()).encode_by_ref(buf),
-                DatabaseKind::SqlLite => {
-                    SpatiaLiteGeometry::from(self.0.clone()).encode_by_ref(buf)
-                }
-            }
+            PgGeometry::new(self.0.clone()).encode_by_ref(buf)
         }
     }
-
-    impl<'r, DB> Decode<'r, DB> for AutoGeometry
-    where
-        DB: Database,
-        DatabaseKind: From<PhantomData<DB>>,
-        &'r [u8]: Decode<'r, DB>,
-    {
-        fn decode(
-            value: <DB as ::sqlx::database::HasValueRef<'r>>::ValueRef,
-        ) -> Result<Self, ::sqlx::error::BoxDynError> {
-            match DatabaseKind::new::<DB>() {
-                DatabaseKind::Postgres => PgGeometry::decode(value)
-                    .map(types::Geometry::from)
-                    .map(Self::from),
-                DatabaseKind::SqlLite => SpatiaLiteGeometry::decode(value)
-                    .map(types::Geometry::from)
-                    .map(Self::from),
-            }
+    impl<'q> Encode<'q, Sqlite> for AutoGeometry {
+        fn encode_by_ref(
+            &self,
+            buf: &mut <Sqlite as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
+        ) -> ::sqlx::encode::IsNull {
+            <SpatiaLiteGeometry as Encode<'q, Sqlite>>::encode_by_ref(
+                &SpatiaLiteGeometry::new(self.0.clone()),
+                buf,
+            )
         }
     }
-
     impl_geometry_sqlx_codecs!(Auto);
 
     enum DatabaseKind {
         Postgres,
         SqlLite,
-    }
-
-    impl DatabaseKind {
-        pub fn new<DB: Database>() -> Self
-        where
-            Self: From<PhantomData<DB>>,
-        {
-            Self::from(PhantomData::<DB>)
-        }
     }
 
     impl From<PhantomData<Postgres>> for DatabaseKind {

@@ -1,5 +1,4 @@
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian, ReadBytesExt, WriteBytesExt};
-use paste::paste;
 
 use std::{
     io::{Cursor, Read, Write},
