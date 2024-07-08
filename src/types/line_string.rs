@@ -9,7 +9,6 @@ pub struct LineString<const N: usize, U> {
     pub srid: Option<u32>,
 }
 
-
 impl<const N: usize, U> LineString<N, U> {
     pub fn new<V: Into<LineStringCoordinates<N, U>>>(coordinates: V) -> Self {
         Self {
@@ -32,3 +31,4 @@ where
         }
     }
 }
+

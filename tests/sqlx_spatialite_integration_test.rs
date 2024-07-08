@@ -1,6 +1,9 @@
 use std::{error::Error, str::FromStr};
 
-use sql_gis::{spatialite::SpatiaLitePoint, sql_types::SpatiaLiteGeometry, types::Point};
+use sql_gis::{
+    sql_types::{AutoPoint, SpatiaLiteGeometry, SpatiaLitePoint},
+    types::Point,
+};
 use sqlx::{sqlite::SqliteConnectOptions, Connection, SqliteConnection};
 
 /// Crée une base de données en mémoire, et charge l'extension SpatiaLite.
@@ -23,7 +26,7 @@ async fn setup() -> Result<SqliteConnection, Box<dyn Error>> {
     Ok(conn)
 }
 
-#[tokio::test]
+#[sqlx::test]
 /// Teste l'encodage/décodage d'une géométrie (point) depuis SpatiaLite
 async fn test_spatialite_isomorphism() -> Result<(), Box<dyn Error>> {
     let mut conn = setup().await.expect("cannot setup test environment");
@@ -45,14 +48,14 @@ async fn test_spatialite_isomorphism() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[tokio::test]
+#[sqlx::test]
 /// Teste l'insertion de deux points dans une table, et la sélection d'un point qui se trouve dans
 /// une surface donnée (via ST_Within)
 ///
 /// Le test ne doit pas retourner le point qui se trouve en dehors de la surface de sélection.
 async fn test_spatialite_st_within() -> Result<(), Box<dyn Error>> {
     Ok(())
-    /* 
+    /*
     let mut conn = setup().await.expect("cannot setup test environment");
 
     let expected = PointS::<SpatiaLite>::new([10.0, 20.0]);

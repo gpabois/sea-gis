@@ -1,22 +1,14 @@
-use line_string::LineStringCoordinates;
-use multi_line_string::MultiLineStringCoordinates;
-use multi_point::MultiPointCoordinates;
-use multi_polygon::MultiPolygonCoordinates;
-use point::PointCoordinates;
-use polygon::PolygonCoordinates;
-use serde::{de::{Visitor, Error as _}, ser::{SerializeMap, Error as _}, Deserialize, Serialize};
-
-mod vectors;
-mod mbr;
-mod point;
-mod multi_point;
 mod line_string;
+mod mbr;
 mod multi_line_string;
-mod polygon;
+mod multi_point;
 mod multi_polygon;
+mod point;
+mod polygon;
+mod vectors;
 
-pub use vectors::{Vector, VectorArray, VectorMatrix, VectorTensor};
 pub use mbr::MBR;
+pub use vectors::{Vector, VectorArray, VectorMatrix, VectorTensor};
 
 pub type Vector2D = Vector<2, f64>;
 pub type VectorArray2D = VectorArray<2, f64>;
@@ -51,7 +43,6 @@ pub type LineStringZ = line_string::LineString<3, f64>;
 pub type MultiLineStringZ = multi_line_string::MultiLineString<3, f64>;
 pub type PolygonZ = polygon::Polygon<3, f64>;
 pub type MultiPolygonZ = multi_polygon::MultiPolygon<3, f64>;
-
 
 /// Représente toutes les géométries possibles.
 #[derive(Debug, Clone, PartialEq)]
@@ -95,7 +86,7 @@ impl Geometry {
             Geometry::Point(_) => GeometryKind::Point,
             Geometry::LineString(_) => GeometryKind::LineString,
             Geometry::Polygon(_) => GeometryKind::Polygon,
-            Geometry::MultiPoint(_) => GeometryKind::MultiPolygon,
+            Geometry::MultiPoint(_) => GeometryKind::MultiPoint,
             Geometry::MultiLineString(_) => GeometryKind::MultiLineString,
             Geometry::MultiPolygon(_) => GeometryKind::MultiPolygon,
             Geometry::PointZ(_) => GeometryKind::PointZ,
@@ -227,7 +218,6 @@ impl std::fmt::Display for GeometryKind {
         write!(f, "{kind_str}")
     }
 }
-
 
 impl From<Point> for Geometry {
     fn from(value: Point) -> Self {
@@ -477,9 +467,9 @@ pub enum Coordinates {
     VectorTensor2D(VectorTensor<2, f64>),
 
     Vector3D(Vector<3, f64>),
-    VectorArray3D( VectorArray<3, f64>),
+    VectorArray3D(VectorArray<3, f64>),
     VectorMatrix3D(VectorMatrix<3, f64>),
-    VectorTensor3D(VectorTensor<3, f64>)
+    VectorTensor3D(VectorTensor<3, f64>),
 }
 
 /// Coordonnées empruntées d'une géométrie.
@@ -492,7 +482,7 @@ pub enum CoordinatesMutRef<'a> {
     Vector3D(&'a mut Vector<3, f64>),
     VectorArray3D(&'a mut VectorArray<3, f64>),
     VectorMatrix3D(&'a mut VectorMatrix<3, f64>),
-    VectorTensor3D(&'a mut VectorTensor<3, f64>)
+    VectorTensor3D(&'a mut VectorTensor<3, f64>),
 }
 
 impl<'a> TryFrom<CoordinatesMutRef<'a>> for &'a mut Vector<2, f64> {
@@ -501,7 +491,7 @@ impl<'a> TryFrom<CoordinatesMutRef<'a>> for &'a mut Vector<2, f64> {
     fn try_from(value: CoordinatesMutRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesMutRef::Vector2D(a) => Ok(a),
-            _ => panic!("not a 2D vector")
+            _ => panic!("not a 2D vector"),
         }
     }
 }
@@ -512,7 +502,7 @@ impl<'a> TryFrom<CoordinatesMutRef<'a>> for &'a mut VectorArray<2, f64> {
     fn try_from(value: CoordinatesMutRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesMutRef::VectorArray2D(a) => Ok(a),
-            _ => panic!("not an array of 2D vectors")
+            _ => panic!("not an array of 2D vectors"),
         }
     }
 }
@@ -523,7 +513,7 @@ impl<'a> TryFrom<CoordinatesMutRef<'a>> for &'a mut VectorMatrix<2, f64> {
     fn try_from(value: CoordinatesMutRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesMutRef::VectorMatrix2D(a) => Ok(a),
-            _ => panic!("not a matrix of 2D vectors")
+            _ => panic!("not a matrix of 2D vectors"),
         }
     }
 }
@@ -534,7 +524,7 @@ impl<'a> TryFrom<CoordinatesMutRef<'a>> for &'a mut VectorTensor<2, f64> {
     fn try_from(value: CoordinatesMutRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesMutRef::VectorTensor2D(a) => Ok(a),
-            _ => panic!("not a matrix of 2D vectors")
+            _ => panic!("not a matrix of 2D vectors"),
         }
     }
 }
@@ -545,7 +535,7 @@ impl<'a> TryFrom<CoordinatesMutRef<'a>> for &'a mut Vector<3, f64> {
     fn try_from(value: CoordinatesMutRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesMutRef::Vector3D(a) => Ok(a),
-            _ => panic!("not a 3D vector")
+            _ => panic!("not a 3D vector"),
         }
     }
 }
@@ -556,7 +546,7 @@ impl<'a> TryFrom<CoordinatesMutRef<'a>> for &'a mut VectorArray<3, f64> {
     fn try_from(value: CoordinatesMutRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesMutRef::VectorArray3D(a) => Ok(a),
-            _ => panic!("not an array of 3D vectors")
+            _ => panic!("not an array of 3D vectors"),
         }
     }
 }
@@ -567,7 +557,7 @@ impl<'a> TryFrom<CoordinatesMutRef<'a>> for &'a mut VectorMatrix<3, f64> {
     fn try_from(value: CoordinatesMutRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesMutRef::VectorMatrix3D(a) => Ok(a),
-            _ => panic!("not a matrix of 3D vectors")
+            _ => panic!("not a matrix of 3D vectors"),
         }
     }
 }
@@ -578,7 +568,7 @@ impl<'a> TryFrom<CoordinatesMutRef<'a>> for &'a mut VectorTensor<3, f64> {
     fn try_from(value: CoordinatesMutRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesMutRef::VectorTensor3D(a) => Ok(a),
-            _ => panic!("not a matrix of 3D vectors")
+            _ => panic!("not a matrix of 3D vectors"),
         }
     }
 }
@@ -593,7 +583,7 @@ pub enum CoordinatesRef<'a> {
     Vector3D(&'a Vector<3, f64>),
     VectorArray3D(&'a VectorArray<3, f64>),
     VectorMatrix3D(&'a VectorMatrix<3, f64>),
-    VectorTensor3D(&'a VectorTensor<3, f64>)
+    VectorTensor3D(&'a VectorTensor<3, f64>),
 }
 
 impl<'a> TryFrom<CoordinatesRef<'a>> for &'a Vector<2, f64> {
@@ -602,7 +592,7 @@ impl<'a> TryFrom<CoordinatesRef<'a>> for &'a Vector<2, f64> {
     fn try_from(value: CoordinatesRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesRef::Vector2D(a) => Ok(a),
-            _ => panic!("not a 2D vector")
+            _ => panic!("not a 2D vector"),
         }
     }
 }
@@ -613,7 +603,7 @@ impl<'a> TryFrom<CoordinatesRef<'a>> for &'a VectorArray<2, f64> {
     fn try_from(value: CoordinatesRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesRef::VectorArray2D(a) => Ok(a),
-            _ => panic!("not an array of 2D vectors")
+            _ => panic!("not an array of 2D vectors"),
         }
     }
 }
@@ -624,7 +614,7 @@ impl<'a> TryFrom<CoordinatesRef<'a>> for &'a VectorMatrix<2, f64> {
     fn try_from(value: CoordinatesRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesRef::VectorMatrix2D(a) => Ok(a),
-            _ => panic!("not a matrix of 2D vectors")
+            _ => panic!("not a matrix of 2D vectors"),
         }
     }
 }
@@ -635,7 +625,7 @@ impl<'a> TryFrom<CoordinatesRef<'a>> for &'a VectorTensor<2, f64> {
     fn try_from(value: CoordinatesRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesRef::VectorTensor2D(a) => Ok(a),
-            _ => panic!("not a matrix of 2D vectors")
+            _ => panic!("not a matrix of 2D vectors"),
         }
     }
 }
@@ -646,7 +636,7 @@ impl<'a> TryFrom<CoordinatesRef<'a>> for &'a Vector<3, f64> {
     fn try_from(value: CoordinatesRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesRef::Vector3D(a) => Ok(a),
-            _ => panic!("not a 3D vector")
+            _ => panic!("not a 3D vector"),
         }
     }
 }
@@ -657,7 +647,7 @@ impl<'a> TryFrom<CoordinatesRef<'a>> for &'a VectorArray<3, f64> {
     fn try_from(value: CoordinatesRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesRef::VectorArray3D(a) => Ok(a),
-            _ => panic!("not an array of 3D vectors")
+            _ => panic!("not an array of 3D vectors"),
         }
     }
 }
@@ -668,7 +658,7 @@ impl<'a> TryFrom<CoordinatesRef<'a>> for &'a VectorMatrix<3, f64> {
     fn try_from(value: CoordinatesRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesRef::VectorMatrix3D(a) => Ok(a),
-            _ => panic!("not a matrix of 3D vectors")
+            _ => panic!("not a matrix of 3D vectors"),
         }
     }
 }
@@ -679,7 +669,7 @@ impl<'a> TryFrom<CoordinatesRef<'a>> for &'a VectorTensor<3, f64> {
     fn try_from(value: CoordinatesRef<'a>) -> Result<Self, Self::Error> {
         match value {
             CoordinatesRef::VectorTensor3D(a) => Ok(a),
-            _ => panic!("not a matrix of 3D vectors")
+            _ => panic!("not a matrix of 3D vectors"),
         }
     }
 }

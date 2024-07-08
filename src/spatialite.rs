@@ -55,69 +55,65 @@ impl From<SpatiaLiteGeometry> for Geometry {
     }
 }
 
+impl_geometry_proxies!(SpatiaLite);
+
+/// Implémente l'encodage / décodage pour Sea ORM
+mod sea_orm {
+    use super::*;
+
+    use sea_query::{ArrayType, ColumnType, Nullable, Value, ValueType};
+
+    impl From<SpatiaLiteGeometry> for Value {
+        fn from(value: SpatiaLiteGeometry) -> Self {
+            let mut buf = Vec::<u8>::default();
+            value
+                .encode_to_stream(&mut buf)
+                .expect("cannot encode SpatiaLite geometry");
+            buf.into()
+        }
+    }
+
+    impl Nullable for SpatiaLiteGeometry {
+        fn null() -> sea_orm::Value {
+            sea_orm::Value::Bytes(None)
+        }
+    }
+
+    impl ValueType for SpatiaLiteGeometry {
+        fn try_from(v: Value) -> Result<Self, sea_query::ValueTypeErr> {
+            match v {
+                Value::Bytes(Some(boxed_buf)) => {
+                    let mut buf = Cursor::new(boxed_buf.as_ref());
+                    SpatiaLiteGeometry::decode_from_stream(&mut buf)
+                        .map_err(|_| sea_query::ValueTypeErr)
+                }
+                _ => Err(sea_query::ValueTypeErr),
+            }
+        }
+
+        fn type_name() -> String {
+            stringify!(EWKBGeometry).to_owned()
+        }
+
+        fn array_type() -> sea_query::ArrayType {
+            ArrayType::Bytes
+        }
+
+        fn column_type() -> sea_orm::ColumnType {
+            ColumnType::Bit(None)
+        }
+    }
+}
+
 /// Implémente l'encodage / décodage depuis sqlx
 mod sqlx {
     use super::*;
     use ::sqlx::{Database, Decode, Encode, Type};
 
-    macro_rules!  impl_geometry_codec {
-        ($geometry_type:ident) => {
-            paste! {
-                impl<'r, DB> Type<DB> for [<SpatiaLite $geometry_type>] 
-                where DB: Database, SpatiaLiteGeometry: Type<DB>,
-                {
-                    fn type_info() -> <DB as Database>::TypeInfo {
-                        SpatiaLiteGeometry::type_info()
-                    }
-                }
-
-                impl<'r, DB> Decode<'r, DB> for [<SpatiaLite $geometry_type>] 
-                where
-                    DB: Database,
-                    SpatiaLiteGeometry: Decode<'r, DB>,
-                {
-                    fn decode(
-                        value: <DB as ::sqlx::database::HasValueRef<'r>>::ValueRef,
-                    ) -> Result<Self, ::sqlx::error::BoxDynError> {
-                        let geom = SpatiaLiteGeometry::decode(value)?.0;
-                        Ok(Self(geom.try_into()?))
-                    }
-                }         
-
-                impl<'q, DB> Encode<'q, DB> for [<SpatiaLite $geometry_type>] 
-                where
-                    DB: Database,
-                    SpatiaLiteGeometry: Encode<'q, DB>,
-                {
-                    fn encode_by_ref(
-                        &self,
-                        buf: &mut <DB as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
-                    ) -> ::sqlx::encode::IsNull {
-                        SpatiaLiteGeometry(self.0.clone().into()).encode_by_ref(buf)
-                    }
-                }  
-            }
-    
-        };
-    }
-
-    impl_geometry_codec!(Point);
-    impl_geometry_codec!(MultiPoint);
-    impl_geometry_codec!(LineString);
-    impl_geometry_codec!(MultiLineString);
-    impl_geometry_codec!(Polygon);
-    impl_geometry_codec!(MultiPolygon);
-
-    impl_geometry_codec!(PointZ);
-    impl_geometry_codec!(MultiPointZ);
-    impl_geometry_codec!(LineStringZ);
-    impl_geometry_codec!(MultiLineStringZ);
-    impl_geometry_codec!(PolygonZ);
-    impl_geometry_codec!(MultiPolygonZ);
-
-
-    impl<'r, DB> Type<DB> for SpatiaLiteGeometry 
-    where DB: Database, &'r [u8]: Type<DB>,
+    impl<'r, DB> Type<DB> for SpatiaLiteGeometry
+    where
+        DB: Database,
+        &'r [u8]: Type<DB>,
     {
         fn type_info() -> <DB as Database>::TypeInfo {
             <&[u8]>::type_info()

@@ -3,18 +3,20 @@
 //!
 //! Voir [self::EWKBGeometry]
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian, ReadBytesExt, WriteBytesExt};
-
 use std::{
     io::{Cursor, Read, Write},
     marker::PhantomData,
     ops::{Deref, DerefMut},
 };
 
-use crate::types::{GenLineString, GenMultiLineString, GenMultiPoint, GenMultiPolygon, GenPoint, GenPolygon, LineString, LineStringZ, MultiLineString, MultiLineStringZ, MultiPoint, MultiPointZ, MultiPolygon, MultiPolygonZ, Point, PointZ, Polygon, PolygonZ, Vector, VectorArray, VectorMatrix, VectorTensor};
-
-use super::types::{
-    Geometry, GeometryKind
+use crate::types::{
+    GenLineString, GenMultiLineString, GenMultiPoint, GenMultiPolygon, GenPoint, GenPolygon,
+    LineString, LineStringZ, MultiLineString, MultiLineStringZ, MultiPoint, MultiPointZ,
+    MultiPolygon, MultiPolygonZ, Point, PointZ, Polygon, PolygonZ, Vector, VectorArray,
+    VectorMatrix, VectorTensor,
 };
+
+use super::types::{Geometry, GeometryKind};
 
 /// Objet intermédiaire pour encoder/decoder
 /// au format EWKB toute géométrie.
@@ -102,6 +104,49 @@ impl EWKBGeometry {
         }
     }
 
+    /// Encode une géométrie au format EWKB dans le flux de sortie.
+    ///
+    /// Utilise par défaut le boutisme natif.
+    pub fn encode_by_ref_to_stream<W: Write>(
+        geometry: &Geometry,
+        stream: &mut W,
+    ) -> Result<(), std::io::Error> {
+        Self::encode_by_ref_to_stream_with_endianess::<NativeEndian, _>(geometry, stream)
+    }
+
+    /// Encode une géométrie au format EWKB dans le flux de sortie, avec un boutisme défini.
+    pub fn encode_by_ref_to_stream_with_endianess<E: ByteOrder, W: Write>(
+        geometry: &Geometry,
+        stream: &mut W,
+    ) -> Result<(), std::io::Error>
+    where
+        Endianess: From<PhantomData<E>>,
+    {
+        // Write endianness.
+        stream.write_u8(Endianess::from(PhantomData::<E>).into())?;
+
+        // Write the EWKB type
+        geometry.kind().encode_ewkb::<E, _>(stream)?;
+
+        // Write the SRID
+        stream.write_u32::<E>(geometry.srid())?;
+
+        match geometry {
+            Geometry::Point(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::LineString(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::Polygon(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::MultiPoint(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::MultiLineString(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::MultiPolygon(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::PointZ(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::LineStringZ(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::PolygonZ(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::MultiPointZ(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::MultiLineStringZ(a) => a.encode_ewkb::<E, _>(stream),
+            Geometry::MultiPolygonZ(a) => a.encode_ewkb::<E, _>(stream),
+        }
+    }
+
     /// Décode une géométrie encodée en EWKB
     pub fn decode_from_stream<R: Read>(buf: &mut R) -> Result<Self, std::io::Error> {
         // 0: Big Endian, 1: Little Endian
@@ -167,13 +212,13 @@ impl GeometryKind {
             GeometryKind::GeometryCollectionZ => 0x80000007,
         };
 
-        stream.write_u32::<E>(encoded)
+        stream.write_u32::<E>(encoded | 0x20000000)
     }
 
     pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(
         stream: &mut R,
     ) -> Result<Self, std::io::Error> {
-        let kind = match stream.read_u32::<E>()? {
+        let kind = match stream.read_u32::<E>()? & !0x20000000 {
             1 => GeometryKind::Point,
             2 => GeometryKind::LineString,
             3 => GeometryKind::Polygon,
@@ -197,13 +242,15 @@ impl GeometryKind {
     }
 }
 
+impl_geometry_proxies!(EWKB);
+
 const BIG_ENDIAN: u8 = 0;
 const LITTLE_ENDIAN: u8 = 1;
 
 impl<const N: usize> GenPoint<N, f64> {
     /// Encode un point dans un flux binaire.
     pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
-        self,
+        &self,
         stream: &mut W,
     ) -> Result<(), std::io::Error> {
         self.coordinates.encode_ewkb::<E, _>(stream)
@@ -219,7 +266,7 @@ impl<const N: usize> GenPoint<N, f64> {
 impl<const N: usize> GenMultiPoint<N, f64> {
     /// Encode un ensemble de Point dans un flux binaire
     pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
-        self,
+        &self,
         stream: &mut W,
     ) -> Result<(), std::io::Error> {
         self.coordinates.encode_ewkb::<E, _>(stream)
@@ -235,7 +282,7 @@ impl<const N: usize> GenMultiPoint<N, f64> {
 impl<const N: usize> GenLineString<N, f64> {
     /// Encode un ensemble de Point dans un flux binaire
     pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
-        self,
+        &self,
         stream: &mut W,
     ) -> Result<(), std::io::Error> {
         self.coordinates.encode_ewkb::<E, _>(stream)
@@ -251,7 +298,7 @@ impl<const N: usize> GenLineString<N, f64> {
 impl<const N: usize> GenMultiLineString<N, f64> {
     /// Encode dans un flux binaire
     pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
-        self,
+        &self,
         stream: &mut W,
     ) -> Result<(), std::io::Error> {
         self.coordinates.encode_ewkb::<E, _>(stream)
@@ -266,7 +313,7 @@ impl<const N: usize> GenMultiLineString<N, f64> {
 
 impl<const N: usize> GenPolygon<N, f64> {
     pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
-        self,
+        &self,
         stream: &mut W,
     ) -> Result<(), std::io::Error> {
         self.coordinates.encode_ewkb::<E, _>(stream)
@@ -280,7 +327,7 @@ impl<const N: usize> GenPolygon<N, f64> {
 
 impl<const N: usize> GenMultiPolygon<N, f64> {
     pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
-        self,
+        &self,
         stream: &mut W,
     ) -> Result<(), std::io::Error> {
         self.coordinates.encode_ewkb::<E, _>(stream)
@@ -294,7 +341,7 @@ impl<const N: usize> GenMultiPolygon<N, f64> {
 impl<const N: usize> Vector<N, f64> {
     /// Encode un vecteur N-D
     pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
-        self,
+        &self,
         stream: &mut W,
     ) -> Result<(), std::io::Error> {
         for i in 0..N {
@@ -319,13 +366,13 @@ impl<const N: usize> Vector<N, f64> {
 impl<const N: usize> VectorArray<N, f64> {
     /// Encode une liste de vecteurs dans le flux de sortie.
     pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
-        self,
+        &self,
         stream: &mut W,
     ) -> Result<(), std::io::Error> {
         // Write number of Point.
         stream.write_u32::<E>(self.len() as u32)?;
 
-        for vector in self.into_iter() {
+        for vector in self.iter() {
             vector.encode_ewkb::<E, _>(stream)?;
         }
 
@@ -336,10 +383,10 @@ impl<const N: usize> VectorArray<N, f64> {
     pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(
         stream: &mut R,
     ) -> Result<Self, std::io::Error> {
-        let nb_Point: u32 = stream.read_u32::<E>()?;
-        let mut coordinates = Vec::<Vector<N, f64>>::with_capacity(nb_Point as usize);
+        let nb_points: u32 = stream.read_u32::<E>()?;
+        let mut coordinates = Vec::<Vector<N, f64>>::with_capacity(nb_points as usize);
 
-        for _ in 0..nb_Point {
+        for _ in 0..nb_points {
             coordinates.push(Vector::decode_ewkb::<E, _>(stream)?);
         }
 
@@ -349,13 +396,13 @@ impl<const N: usize> VectorArray<N, f64> {
 
 impl<const N: usize> VectorMatrix<N, f64> {
     pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
-        self,
+        &self,
         stream: &mut W,
     ) -> Result<(), std::io::Error> {
         // Write number of Point.
         stream.write_u32::<E>(self.len() as u32)?;
 
-        for vector in self.into_iter() {
+        for vector in self.iter() {
             vector.encode_ewkb::<E, _>(stream)?;
         }
 
@@ -366,10 +413,10 @@ impl<const N: usize> VectorMatrix<N, f64> {
     pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(
         stream: &mut R,
     ) -> Result<Self, std::io::Error> {
-        let nb_Point: u32 = stream.read_u32::<E>()?;
-        let mut coordinates = Vec::<VectorArray<N, f64>>::with_capacity(nb_Point as usize);
+        let nb_points: u32 = stream.read_u32::<E>()?;
+        let mut coordinates = Vec::<VectorArray<N, f64>>::with_capacity(nb_points as usize);
 
-        for _ in 0..nb_Point {
+        for _ in 0..nb_points {
             coordinates.push(VectorArray::<N, f64>::decode_ewkb::<E, _>(stream)?);
         }
 
@@ -379,13 +426,13 @@ impl<const N: usize> VectorMatrix<N, f64> {
 
 impl<const N: usize> VectorTensor<N, f64> {
     pub(self) fn encode_ewkb<E: ByteOrder, W: Write>(
-        self,
+        &self,
         stream: &mut W,
     ) -> Result<(), std::io::Error> {
         // Write number of Point.
         stream.write_u32::<E>(self.len() as u32)?;
 
-        for vector in self.into_iter() {
+        for vector in self.iter() {
             vector.encode_ewkb::<E, _>(stream)?;
         }
 
@@ -395,10 +442,10 @@ impl<const N: usize> VectorTensor<N, f64> {
     pub(self) fn decode_ewkb<E: ByteOrder, R: Read>(
         stream: &mut R,
     ) -> Result<Self, std::io::Error> {
-        let nb_Point: u32 = stream.read_u32::<E>()?;
-        let mut coordinates = Vec::<VectorMatrix<N, f64>>::with_capacity(nb_Point as usize);
+        let nb_points: u32 = stream.read_u32::<E>()?;
+        let mut coordinates = Vec::<VectorMatrix<N, f64>>::with_capacity(nb_points as usize);
 
-        for _ in 0..nb_Point {
+        for _ in 0..nb_points {
             coordinates.push(VectorMatrix::<N, f64>::decode_ewkb::<E, _>(stream)?);
         }
 
@@ -435,8 +482,14 @@ impl From<Endianess> for u8 {
 
 /// Implémente l'encodage / décodage depuis sqlx
 mod sqlx {
-    use super::EWKBGeometry;
-    use sqlx::{Database, Decode, Encode};
+    use super::*;
+    use ::sqlx::{postgres::PgTypeInfo, Database, Decode, Encode, Postgres, Type};
+
+    impl<'r> Type<Postgres> for EWKBGeometry {
+        fn type_info() -> PgTypeInfo {
+            PgTypeInfo::with_name("geometry")
+        }
+    }
 
     impl<'r, DB> Decode<'r, DB> for EWKBGeometry
     where
@@ -444,9 +497,10 @@ mod sqlx {
         &'r [u8]: Decode<'r, DB>,
     {
         fn decode(
-            value: <DB as sqlx::database::HasValueRef<'r>>::ValueRef,
-        ) -> Result<Self, sqlx::error::BoxDynError> {
+            value: <DB as ::sqlx::database::HasValueRef<'r>>::ValueRef,
+        ) -> Result<Self, ::sqlx::error::BoxDynError> {
             let encoded = <&'r [u8] as Decode<DB>>::decode(value)?;
+            println!("{:?}", encoded);
             let decoded = Self::try_from(encoded)?;
             Ok(decoded)
         }
@@ -459,19 +513,20 @@ mod sqlx {
     {
         fn encode_by_ref(
             &self,
-            buf: &mut <DB as sqlx::database::HasArguments<'q>>::ArgumentBuffer,
-        ) -> sqlx::encode::IsNull {
+            buf: &mut <DB as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
+        ) -> ::sqlx::encode::IsNull {
             let mut encoded = Vec::<u8>::new();
             self.clone()
                 .encode_to_stream(&mut encoded)
-                .expect("cannot encode EWKB");
+                .expect("cannot decode EWKB");
+            println!("{:?}", encoded);
             encoded.encode_by_ref(buf)
         }
 
         fn encode(
             self,
-            buf: &mut <DB as sqlx::database::HasArguments<'q>>::ArgumentBuffer,
-        ) -> sqlx::encode::IsNull
+            buf: &mut <DB as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
+        ) -> ::sqlx::encode::IsNull
         where
             Self: Sized,
         {
@@ -481,6 +536,8 @@ mod sqlx {
             encoded.encode(buf)
         }
     }
+
+    impl_geometry_sqlx_codecs!(EWKB);
 }
 
 /// Implémente l'encodage / décodage pour Sea ORM

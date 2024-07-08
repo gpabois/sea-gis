@@ -128,8 +128,8 @@ impl<const N: usize, U> FromIterator<Vector<N, U>> for VectorArray<N, U> {
     }
 }
 
-impl<const N: usize, U> FromIterator<[U;N]> for VectorArray<N, U> {
-    fn from_iter<T: IntoIterator<Item = [U;N]>>(iter: T) -> Self {
+impl<const N: usize, U> FromIterator<[U; N]> for VectorArray<N, U> {
+    fn from_iter<T: IntoIterator<Item = [U; N]>>(iter: T) -> Self {
         Self::from_iter(iter.into_iter().map(Vector::from))
     }
 }
@@ -150,7 +150,6 @@ impl<const N: usize, U> Deref for VectorArray<N, U> {
         &self.0
     }
 }
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Une matrice 2D de vecteur de dimension N.
@@ -213,7 +212,6 @@ where
     }
 }
 
-
 impl<const N: usize, U> Deref for VectorMatrix<N, U> {
     type Target = [VectorArray<N, U>];
 
@@ -237,22 +235,19 @@ impl<const N: usize, U> IntoIterator for VectorMatrix<N, U> {
     }
 }
 
-impl<const N: usize, U> FromIterator<VectorArray<N,U>> for VectorMatrix<N, U> {
-    fn from_iter<T: IntoIterator<Item = VectorArray<N,U>>>(iter: T) -> Self {
+impl<const N: usize, U> FromIterator<VectorArray<N, U>> for VectorMatrix<N, U> {
+    fn from_iter<T: IntoIterator<Item = VectorArray<N, U>>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
     }
 }
 
-impl<const N: usize, U> FromIterator<Vec<[U;N]>> for VectorMatrix<N, U> {
-    fn from_iter<T: IntoIterator<Item = Vec<[U;N]>>>(iter: T) -> Self {
-        let arrays = iter
-        .into_iter()
-        .map(VectorArray::from_iter);
+impl<const N: usize, U> FromIterator<Vec<[U; N]>> for VectorMatrix<N, U> {
+    fn from_iter<T: IntoIterator<Item = Vec<[U; N]>>>(iter: T) -> Self {
+        let arrays = iter.into_iter().map(VectorArray::from_iter);
 
         Self::from_iter(arrays)
     }
 }
-
 
 impl<const N: usize, U> VectorMatrix<N, U>
 where
@@ -291,7 +286,6 @@ where
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Un tenseur 3D de vecteur de dimension N
 pub struct VectorTensor<const N: usize, U>(Vec<VectorMatrix<N, U>>);
@@ -301,7 +295,6 @@ impl<const N: usize, U> VectorTensor<N, U> {
         Self(coordinates)
     }
 }
-
 
 impl<const N: usize, U> Deref for VectorTensor<N, U> {
     type Target = [VectorMatrix<N, U>];
@@ -320,17 +313,15 @@ impl<const N: usize, U> IntoIterator for VectorTensor<N, U> {
     }
 }
 
-impl<const N: usize, U> FromIterator<VectorMatrix<N,U>> for VectorTensor<N, U> {
-    fn from_iter<T: IntoIterator<Item = VectorMatrix<N,U>>>(iter: T) -> Self {
+impl<const N: usize, U> FromIterator<VectorMatrix<N, U>> for VectorTensor<N, U> {
+    fn from_iter<T: IntoIterator<Item = VectorMatrix<N, U>>>(iter: T) -> Self {
         Self(iter.into_iter().collect())
     }
 }
 
-impl<const N: usize, U> FromIterator<Vec<Vec<[U;N]>>> for VectorTensor<N, U> {
-    fn from_iter<T: IntoIterator<Item = Vec<Vec<[U;N]>>>>(iter: T) -> Self {
-        let matrixes = iter
-        .into_iter()
-        .map(VectorMatrix::from_iter);
+impl<const N: usize, U> FromIterator<Vec<Vec<[U; N]>>> for VectorTensor<N, U> {
+    fn from_iter<T: IntoIterator<Item = Vec<Vec<[U; N]>>>>(iter: T) -> Self {
+        let matrixes = iter.into_iter().map(VectorMatrix::from_iter);
 
         Self::from_iter(matrixes)
     }
