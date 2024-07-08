@@ -35,7 +35,6 @@ impl From<AutoGeometry> for types::Geometry {
 impl_geometry_proxies!(Auto);
 
 mod sqlx {
-    use std::fmt::write;
     use std::marker::PhantomData;
 
     use ::sqlx::{Database, Decode, Encode, Type};
