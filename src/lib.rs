@@ -1,5 +1,6 @@
 pub mod sql_types;
 pub mod types;
+mod io;
 
 pub mod error;
 pub mod functions;
@@ -83,7 +84,7 @@ macro_rules! impl_geometry_sqlx_codec {
                 fn decode(
                     value: <DB as ::sqlx::database::HasValueRef<'r>>::ValueRef,
                 ) -> Result<Self, ::sqlx::error::BoxDynError> {
-                    let geom = [<$ns Geometry>]::decode(value)?.0;
+                    let geom = <[<$ns Geometry>] as ::sqlx::Decode<'r, DB>>::decode(value)?.0;
                     Ok(Self(geom.try_into()?))
                 }
             }
@@ -122,17 +123,19 @@ macro_rules! impl_geometry_sqlx_codecs {
     };
 }
 
-mod auto;
-pub mod ewkb;
-pub mod geo_json;
-mod postgis;
-mod spatialite;
-
 macro_rules! impl_geometry_proxy {
     ($ns:ident, $geometry_type:ident) => {
         ::paste::paste! {
             #[derive(Debug, Clone, PartialEq)]
             pub struct [<$ns $geometry_type>] (crate::types::$geometry_type);
+
+            impl crate::types::GeometryImpl for [<$ns $geometry_type>] {
+                type Coordinates = <crate::types::$geometry_type as crate::types::GeometryImpl> :: Coordinates;
+
+                fn new<C: Into<Self::Coordinates>>(coordinates: C) -> Self {
+                    Self::from(crate::types::$geometry_type::new(coordinates))
+                }
+            }
 
             impl From<[<$ns $geometry_type>]> for crate::types::Geometry  {
                 fn from(value: [<$ns $geometry_type>]) -> Self {
@@ -207,7 +210,7 @@ macro_rules! impl_geometry_sqlx_codec {
                 fn decode(
                     value: <DB as ::sqlx::database::HasValueRef<'r>>::ValueRef,
                 ) -> Result<Self, ::sqlx::error::BoxDynError> {
-                    let geom = [<$ns Geometry>]::decode(value)?.0;
+                    let geom = <[<$ns Geometry>] as ::sqlx::Decode<'r, DB>>::decode(value)?.0;
                     Ok(Self(geom.try_into()?))
                 }
             }

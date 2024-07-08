@@ -6,11 +6,7 @@ use serde::{
 use std::ops::Deref;
 
 use crate::types::{
-    self, Coordinates, Geometry, GeometryKind, LineString, LineStringZ, MultiLineString,
-    MultiLineStringZ, MultiPoint, MultiPointZ, MultiPolygon, MultiPolygonZ, Point, PointZ, Polygon,
-    PolygonZ, Vector, VectorArray, VectorMatrix, VectorTensor, GEOMETRY_COLLECTION_KIND_STR,
-    LINE_STRING_KIND_STR, MULTI_LINE_STRING_KIND_STR, MULTI_POINT_KIND_STR, MULTI_POLYGON_KIND_STR,
-    POINT_KIND_STR, POLYGON_KIND_STR,
+    self, Coordinates, Geometry, GeometryImpl as _, GeometryKind, LineString, LineStringZ, MultiLineString, MultiLineStringZ, MultiPoint, MultiPointZ, MultiPolygon, MultiPolygonZ, Point, PointZ, Polygon, PolygonZ, Vector, VectorArray, VectorMatrix, VectorTensor, GEOMETRY_COLLECTION_KIND_STR, LINE_STRING_KIND_STR, MULTI_LINE_STRING_KIND_STR, MULTI_POINT_KIND_STR, MULTI_POLYGON_KIND_STR, POINT_KIND_STR, POLYGON_KIND_STR
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -284,7 +280,7 @@ impl Serialize for GeoJsonCoordinatesRef<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::types::{LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon};
+    use crate::types::{GeometryImpl as _, LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon};
 
     use super::GeoJsonGeometry;
 

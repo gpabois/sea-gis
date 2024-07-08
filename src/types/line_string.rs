@@ -1,4 +1,4 @@
-use super::{VectorArray, MBR};
+use super::{GeometryImpl, VectorArray, MBR};
 
 pub type LineStringCoordinates<const N: usize, U> = VectorArray<N, U>;
 
@@ -9,8 +9,10 @@ pub struct LineString<const N: usize, U> {
     pub srid: Option<u32>,
 }
 
-impl<const N: usize, U> LineString<N, U> {
-    pub fn new<V: Into<LineStringCoordinates<N, U>>>(coordinates: V) -> Self {
+impl<const N: usize, U>  GeometryImpl for LineString<N, U> {
+    type Coordinates = LineStringCoordinates<N, U>;
+
+    fn new<C: Into<Self::Coordinates>>(coordinates: C) -> Self {
         Self {
             coordinates: coordinates.into(),
             srid: None,

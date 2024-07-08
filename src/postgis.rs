@@ -34,11 +34,9 @@ impl DerefMut for PgGeometry {
 impl_geometry_proxies!(Pg);
 
 mod sqlx {
-    use std::io::Cursor;
-
     use ::sqlx::{postgres::PgTypeInfo, Decode, Encode, Postgres, Type};
 
-    use crate::ewkb::EWKBGeometry;
+    use crate::ewkb;
 
     use super::*;
 
@@ -52,7 +50,7 @@ mod sqlx {
         fn decode(
             value: <Postgres as ::sqlx::database::HasValueRef<'r>>::ValueRef,
         ) -> Result<Self, ::sqlx::error::BoxDynError> {
-            let ewkb = <EWKBGeometry as Decode<'r, Postgres>>::decode(value).unwrap();
+            let ewkb = ewkb::decode_geometry(&mut value.as_bytes()?)?;
             Ok(Self::new(ewkb))
         }
     }
@@ -62,9 +60,8 @@ mod sqlx {
             &self,
             buf: &mut <Postgres as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
         ) -> ::sqlx::encode::IsNull {
-            let mut bytes: Vec<u8> = Vec::default();
-            EWKBGeometry::encode_by_ref_to_stream(self.deref(), &mut bytes).unwrap();
-            <Vec<u8> as Encode<'q, Postgres>>::encode_by_ref(&bytes, buf)
+            ewkb::encode_geometry(self.deref(), buf.deref_mut()).unwrap();
+            ::sqlx::encode::IsNull::No
         }
     }
 

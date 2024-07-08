@@ -1,4 +1,4 @@
-use super::{VectorMatrix, MBR};
+use super::{GeometryImpl, VectorMatrix, MBR};
 
 pub type PolygonCoordinates<const N: usize, U> = VectorMatrix<N, U>;
 
@@ -9,13 +9,11 @@ pub struct Polygon<const N: usize, U> {
     pub srid: Option<u32>,
 }
 
-impl<const N: usize, U> Polygon<N, U>
-where
-    U: PartialEq + Clone,
-{
-    /// Crée un nouveau polygone, avec un SRID de 4326 par défaut.
-    pub fn new<V: Into<PolygonCoordinates<N, U>>>(args: V) -> Self {
-        let mut coordinates: PolygonCoordinates<N, U> = args.into();
+impl<const N: usize, U>  GeometryImpl for Polygon<N, U> where U: Clone + PartialEq {
+    type Coordinates = PolygonCoordinates<N, U>;
+
+    fn new<C: Into<Self::Coordinates>>(coordinates: C) -> Self {
+        let mut coordinates: PolygonCoordinates<N, U> = coordinates.into();
 
         // Ensure we close all rings.
         coordinates.iter_mut().for_each(|v| v.close_ring());
@@ -26,6 +24,7 @@ where
         }
     }
 }
+
 
 impl<const N: usize, U> Polygon<N, U>
 where

@@ -1,8 +1,8 @@
 use std::{error::Error, str::FromStr};
 
 use sql_gis::{
-    sql_types::{AutoPoint, SpatiaLiteGeometry, SpatiaLitePoint},
-    types::Point,
+    sql_types::SpatiaLitePoint,
+    types::{GeometryImpl as _, Point},
 };
 use sqlx::{sqlite::SqliteConnectOptions, Connection, SqliteConnection};
 
@@ -31,7 +31,7 @@ async fn setup() -> Result<SqliteConnection, Box<dyn Error>> {
 async fn test_spatialite_isomorphism() -> Result<(), Box<dyn Error>> {
     let mut conn = setup().await.expect("cannot setup test environment");
 
-    let expected = SpatiaLitePoint::from(Point::new([10.1, 20.2]));
+    let expected = SpatiaLitePoint::new([10.1, 20.2]);
 
     let (id,): (u32,) = sqlx::query_as("INSERT INTO gis_points (pt) VALUES (?) RETURNING id")
         .bind(&expected)
@@ -46,41 +46,4 @@ async fn test_spatialite_isomorphism() -> Result<(), Box<dyn Error>> {
     assert_eq!(expected, value);
 
     Ok(())
-}
-
-#[sqlx::test]
-/// Teste l'insertion de deux points dans une table, et la sélection d'un point qui se trouve dans
-/// une surface donnée (via ST_Within)
-///
-/// Le test ne doit pas retourner le point qui se trouve en dehors de la surface de sélection.
-async fn test_spatialite_st_within() -> Result<(), Box<dyn Error>> {
-    Ok(())
-    /*
-    let mut conn = setup().await.expect("cannot setup test environment");
-
-    let expected = PointS::<SpatiaLite>::new([10.0, 20.0]);
-    let outside = PointS::<SpatiaLite>::new([30.0, 30.0]);
-    let surface = PolygonS::<SpatiaLite>::new([[8.0, 8.0], [8.0, 22.0], [22.0, 22.0], [22.0, 8.0]]);
-
-    sqlx::query("INSERT INTO gis_points (pt) VALUES (?), (?)")
-        .bind(&expected)
-        .bind(&outside)
-        .execute(&mut conn)
-        .await
-        .expect("cannot insert geometry");
-
-    let mut rows: Vec<(u32, PointS<SpatiaLite>)> =
-        sqlx::query_as("SELECT * FROM gis_points WHERE ST_Within(pt, ?)")
-            .bind(&surface)
-            .fetch_all(&mut conn)
-            .await?;
-
-    assert_eq!(rows.len(), 1);
-    let row = rows.pop().unwrap();
-    println!("{:?}", row);
-
-    assert_eq!(row.1, expected);
-
-    Ok(())
-    */
 }

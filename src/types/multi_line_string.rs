@@ -1,4 +1,4 @@
-use super::{VectorMatrix, MBR};
+use super::{GeometryImpl, VectorMatrix, MBR};
 
 pub type MultiLineStringCoordinates<const N: usize, U> = VectorMatrix<N, U>;
 
@@ -9,8 +9,10 @@ pub struct MultiLineString<const N: usize, U> {
     pub srid: Option<u32>,
 }
 
-impl<const N: usize, U> MultiLineString<N, U> {
-    pub fn new<V: Into<MultiLineStringCoordinates<N, U>>>(coordinates: V) -> Self {
+impl<const N: usize, U>  GeometryImpl for MultiLineString<N, U> {
+    type Coordinates = MultiLineStringCoordinates<N, U>;
+
+    fn new<C: Into<Self::Coordinates>>(coordinates: C) -> Self {
         Self {
             coordinates: coordinates.into(),
             srid: None,

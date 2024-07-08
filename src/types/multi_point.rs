@@ -1,4 +1,4 @@
-use super::{VectorArray, MBR};
+use super::{GeometryImpl, VectorArray, MBR};
 
 pub type MultiPointCoordinates<const N: usize, U> = VectorArray<N, U>;
 
@@ -7,6 +7,17 @@ pub type MultiPointCoordinates<const N: usize, U> = VectorArray<N, U>;
 pub struct MultiPoint<const N: usize, U> {
     pub coordinates: MultiPointCoordinates<N, U>,
     pub srid: Option<u32>,
+}
+
+impl<const N: usize, U>  GeometryImpl for MultiPoint<N, U> {
+    type Coordinates = MultiPointCoordinates<N, U>;
+
+    fn new<C: Into<Self::Coordinates>>(coordinates: C) -> Self {
+        Self {
+            coordinates: coordinates.into(),
+            srid: None,
+        }
+    }
 }
 
 impl<const N: usize, U> MultiPoint<N, U>
@@ -19,15 +30,6 @@ where
             max_x: self.coordinates.max_x(),
             min_y: self.coordinates.min_y(),
             max_y: self.coordinates.max_y(),
-        }
-    }
-}
-
-impl<const N: usize, U> MultiPoint<N, U> {
-    pub fn new<V: Into<MultiPointCoordinates<N, U>>>(coordinates: V) -> Self {
-        Self {
-            coordinates: coordinates.into(),
-            srid: None,
         }
     }
 }

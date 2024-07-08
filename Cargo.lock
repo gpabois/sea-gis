@@ -2393,7 +2393,6 @@ name = "sql-gis"
 version = "0.1.0"
 dependencies = [
  "byteorder",
- "hex",
  "paste",
  "sea-orm",
  "sea-query",

@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use super::{Vector, MBR};
+use super::{GeometryImpl, Vector, MBR};
 
 /// Type représentant les coordonnées d'un point.
 pub type PointCoordinates<const N: usize, U> = Vector<N, U>;
@@ -12,8 +12,10 @@ pub struct Point<const N: usize, U> {
     pub srid: Option<u32>,
 }
 
-impl<const N: usize, U> Point<N, U> {
-    pub fn new<V: Into<PointCoordinates<N, U>>>(coordinates: V) -> Self {
+impl<const N: usize, U>  GeometryImpl for Point<N, U> {
+    type Coordinates = PointCoordinates<N, U>;
+
+    fn new<C: Into<Self::Coordinates>>(coordinates: C) -> Self {
         Self {
             coordinates: coordinates.into(),
             srid: None,

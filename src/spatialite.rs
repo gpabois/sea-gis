@@ -1,15 +1,13 @@
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian, ReadBytesExt, WriteBytesExt};
-use paste::paste;
-use serde::Serialize;
 
 use std::{
-    io::{Cursor, Read, Write},
+    io::{Read, Write},
     marker::PhantomData,
     ops::{Deref, DerefMut},
 };
 
-use crate::{types::{
-    CoordinatesRef, GenLineString, GenMultiLineString, GenMultiPoint, GenMultiPolygon, GenPoint, GenPolygon, Geometry, GeometryKind, LineString, LineStringZ, MultiLineString, MultiLineStringZ, MultiPoint, MultiPointZ, MultiPolygon, MultiPolygonZ, Point, PointZ, Polygon, PolygonZ, Vector, VectorArray, VectorMatrix, VectorTensor, MBR
+use crate::{io::{Decodable, Encodable}, types::{
+    CoordinatesRef, Geometry, GeometryImpl as _, GeometryKind, LineString, LineStringZ, MultiLineString, MultiLineStringZ, MultiPoint, MultiPointZ, MultiPolygon, MultiPolygonZ, Point, PointZ, Polygon, PolygonZ, Vector, VectorArray, VectorMatrix, VectorTensor, MBR
 }, DEFAULT_SRID};
 
 const BIG_ENDIAN: u8 = 0;
@@ -18,6 +16,18 @@ const LITTLE_ENDIAN: u8 = 1;
 #[derive(Debug, Clone, PartialEq)]
 /// Objet intermédiaire pour encoder/décoder une géométrie au format natif de SpatiaLite.
 pub struct SpatiaLiteGeometry(Geometry);
+
+impl Encodable for SpatiaLiteGeometry {
+    fn encode<W: Write>(&self, stream: &mut W) -> Result<(), std::io::Error> {
+        encode_geometry(&self.0, stream)
+    }
+}
+
+impl Decodable for SpatiaLiteGeometry {
+    fn decode<R: Read>(stream: &mut R) -> Result<Self, std::io::Error> {
+        decode_geometry(stream).map(Self::new)
+    }
+}
 
 impl SpatiaLiteGeometry {
     pub fn new<G: Into<Geometry>>(args: G) -> Self {
@@ -57,58 +67,10 @@ impl From<SpatiaLiteGeometry> for Geometry {
 
 impl_geometry_proxies!(SpatiaLite);
 
-/// Implémente l'encodage / décodage pour Sea ORM
-mod sea_orm {
-    use super::*;
-
-    use sea_query::{ArrayType, ColumnType, Nullable, Value, ValueType};
-
-    impl From<SpatiaLiteGeometry> for Value {
-        fn from(value: SpatiaLiteGeometry) -> Self {
-            let mut buf = Vec::<u8>::default();
-            value
-                .encode_to_stream(&mut buf)
-                .expect("cannot encode SpatiaLite geometry");
-            buf.into()
-        }
-    }
-
-    impl Nullable for SpatiaLiteGeometry {
-        fn null() -> sea_orm::Value {
-            sea_orm::Value::Bytes(None)
-        }
-    }
-
-    impl ValueType for SpatiaLiteGeometry {
-        fn try_from(v: Value) -> Result<Self, sea_query::ValueTypeErr> {
-            match v {
-                Value::Bytes(Some(boxed_buf)) => {
-                    let mut buf = Cursor::new(boxed_buf.as_ref());
-                    SpatiaLiteGeometry::decode_from_stream(&mut buf)
-                        .map_err(|_| sea_query::ValueTypeErr)
-                }
-                _ => Err(sea_query::ValueTypeErr),
-            }
-        }
-
-        fn type_name() -> String {
-            stringify!(EWKBGeometry).to_owned()
-        }
-
-        fn array_type() -> sea_query::ArrayType {
-            ArrayType::Bytes
-        }
-
-        fn column_type() -> sea_orm::ColumnType {
-            ColumnType::Bit(None)
-        }
-    }
-}
-
 /// Implémente l'encodage / décodage depuis sqlx
 mod sqlx {
     use super::*;
-    use ::sqlx::{Database, Decode, Encode, Type};
+    use ::sqlx::{sqlite::SqliteValueRef, Database, Decode, Encode, Sqlite, Type};
 
     impl<'r, DB> Type<DB> for SpatiaLiteGeometry
     where
@@ -120,17 +82,14 @@ mod sqlx {
         }
     }
 
-    impl<'r, DB> Decode<'r, DB> for SpatiaLiteGeometry
-    where
-        DB: Database,
-        &'r [u8]: Decode<'r, DB>,
+    impl<'r> Decode<'r, Sqlite> for SpatiaLiteGeometry
     {
         fn decode(
-            value: <DB as ::sqlx::database::HasValueRef<'r>>::ValueRef,
+            value: SqliteValueRef<'r>,
         ) -> Result<Self, ::sqlx::error::BoxDynError> {
-            let encoded = <&'r [u8] as Decode<DB>>::decode(value)?;
-            let decoded = Self::try_from(encoded)?;
-            Ok(decoded)
+            let mut encoded = <&'r [u8] as Decode<'r, Sqlite>>::decode(value)?;
+            let geom = decode_geometry(&mut encoded).map(Self::new)?;
+            Ok(geom)
         }
     }
 
@@ -143,30 +102,16 @@ mod sqlx {
             &self,
             buf: &mut <DB as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
         ) -> ::sqlx::encode::IsNull {
-            let mut encoded = Vec::<u8>::new();
-            self.clone()
-                .encode_to_stream(&mut encoded)
-                .expect("cannot encode to SpatiaLite internal format");
+            let encoded = self.encode_to_vec().unwrap();
             encoded.encode_by_ref(buf)
         }
-
-        fn encode(
-            self,
-            buf: &mut <DB as ::sqlx::database::HasArguments<'q>>::ArgumentBuffer,
-        ) -> ::sqlx::encode::IsNull
-        where
-            Self: Sized,
-        {
-            let mut encoded = Vec::<u8>::new();
-            self.encode_to_stream(&mut encoded)
-                .expect("cannot encode to SpatiaLite internal format");
-            encoded.encode(buf)
-        }
     }
+
+    impl_geometry_sqlx_codecs!(SpatiaLite);
 }
 
 
-pub fn encode_geometry<E: ByteOrder, W: Write>(geometry: &Geometry, stream: &mut W) -> Result<(), std::io::Error> {
+pub fn encode_geometry<W: Write>(geometry: &Geometry, stream: &mut W) -> Result<(), std::io::Error> {
     encode_geometry_with_endianess::<NativeEndian, _>(geometry, stream)
 }
 
@@ -289,6 +234,31 @@ fn decode_geometry_class<E: ByteOrder, R: Read>(stream: &mut R) -> Result<Geomet
     })
 }
 
+fn encode_mbr<E: ByteOrder, W: Write>(mbr: &MBR<f64>, stream: &mut W) -> Result<(), std::io::Error> {
+    stream.write_f64::<E>(mbr.min_x)?;
+    stream.write_f64::<E>(mbr.min_y)?;
+    stream.write_f64::<E>(mbr.max_x)?;
+    stream.write_f64::<E>(mbr.max_y)?;
+    stream.write_u8(0x7C)
+}
+
+fn decode_mbr<E: ByteOrder, R: Read>(stream: &mut R) -> Result<MBR<f64>, std::io::Error> {
+    let min_x = stream.read_f64::<E>()?;
+    let min_y = stream.read_f64::<E>()?;
+    let max_x = stream.read_f64::<E>()?;
+    let max_y = stream.read_f64::<E>()?;
+    let mbr_end = stream.read_u8()?;
+
+    assert_eq!(mbr_end, 0x7C);
+
+    Ok(MBR {
+        min_x,
+        max_x,
+        min_y,
+        max_y,
+    })
+}
+
 fn encode_coordinates<E: ByteOrder, W: Write>(coordinates: CoordinatesRef<'_>, stream: &mut W) -> Result<(), std::io::Error> {
     match coordinates {
         CoordinatesRef::Vector2D(vector) => encode_vector::<2, E, _>(vector, stream),
@@ -316,30 +286,6 @@ fn decode_vector<const N: usize, E: ByteOrder, R: Read>(stream: &mut R) -> Resul
     Ok(Vector::new(scalars))
 }
 
-fn encode_mbr<E: ByteOrder, W: Write>(mbr: &MBR<f64>, stream: &mut W) -> Result<(), std::io::Error> {
-    stream.write_f64::<E>(mbr.min_x)?;
-    stream.write_f64::<E>(mbr.min_y)?;
-    stream.write_f64::<E>(mbr.max_x)?;
-    stream.write_f64::<E>(mbr.max_y)?;
-    stream.write_u8(0x7C)
-}
-
-fn decode_mbr<E: ByteOrder, R: Read>(stream: &mut R) -> Result<MBR<f64>, std::io::Error> {
-    let min_x = stream.read_f64::<E>()?;
-    let min_y = stream.read_f64::<E>()?;
-    let max_x = stream.read_f64::<E>()?;
-    let max_y = stream.read_f64::<E>()?;
-    let mbr_end = stream.read_u8()?;
-
-    assert_eq!(mbr_end, 0x7C);
-
-    Ok(MBR {
-        min_x,
-        max_x,
-        min_y,
-        max_y,
-    })
-}
 
 fn encode_array<const N: usize, E: ByteOrder, W: Write>(array: &VectorArray<N, f64>, stream: &mut W) -> Result<(), std::io::Error> {
         stream.write_u32::<E>(array.len() as u32)?;
@@ -421,18 +367,8 @@ mod tests {
     #[test]
     pub fn test_isomorphism() {
         let expected = SpatiaLiteGeometry::new(Point::new([10.0, 20.0]));
-
-        let mut binary = Vec::<u8>::new();
-
-        expected
-            .clone()
-            .encode_to_stream(&mut binary)
-            .expect("cannot encode to stream");
-
-        let mut stream = Cursor::new(binary);
-        let value =
-            SpatiaLiteGeometry::decode_from_stream(&mut stream).expect("cannot decode from stream");
-
+        let bytes = expected.encode_to_vec().expect("cannot encode geometry");
+        let value = SpatiaLiteGeometry::decode_from_slice(&bytes).expect("cannot decode geometry");
         assert_eq!(value, expected)
     }
 }

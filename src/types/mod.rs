@@ -20,14 +20,6 @@ pub type VectorArray3D = VectorArray<3, f64>;
 pub type VectorMatrix3D = VectorMatrix<3, f64>;
 pub type VectorTensor3D = VectorTensor<3, f64>;
 
-/// Generic type for points, used internally keep it DRY.
-pub(crate) type GenPoint<const N: usize, U> = point::Point<N, U>;
-pub(crate) type GenLineString<const N: usize, U> = line_string::LineString<N, U>;
-pub(crate) type GenPolygon<const N: usize, U> = polygon::Polygon<N, U>;
-pub(crate) type GenMultiPoint<const N: usize, U> = multi_point::MultiPoint<N, U>;
-pub(crate) type GenMultiLineString<const N: usize, U> = multi_line_string::MultiLineString<N, U>;
-pub(crate) type GenMultiPolygon<const N: usize, U> = multi_polygon::MultiPolygon<N, U>;
-
 // A point in a 2D space.
 pub type Point = point::Point<2, f64>;
 pub type MultiPoint = multi_point::MultiPoint<2, f64>;
@@ -43,6 +35,12 @@ pub type LineStringZ = line_string::LineString<3, f64>;
 pub type MultiLineStringZ = multi_line_string::MultiLineString<3, f64>;
 pub type PolygonZ = polygon::Polygon<3, f64>;
 pub type MultiPolygonZ = multi_polygon::MultiPolygon<3, f64>;
+
+pub trait GeometryImpl {
+    type Coordinates;
+
+    fn new<C: Into<Self::Coordinates>>(coordinates: C) -> Self;
+}
 
 /// Représente toutes les géométries possibles.
 #[derive(Debug, Clone, PartialEq)]

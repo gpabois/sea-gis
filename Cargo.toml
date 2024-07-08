@@ -16,4 +16,3 @@ serde = "1.0.203"
 serde_json = "1.0.120"
 testcontainers = "0.19.0"
 sqlx = { version = "0.7.4", features = ["sqlite", "postgres", "macros", "runtime-tokio"] }
-hex = "0.4.3"

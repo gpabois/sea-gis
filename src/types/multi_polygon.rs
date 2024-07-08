@@ -1,4 +1,4 @@
-use super::{VectorTensor, MBR};
+use super::{GeometryImpl, VectorTensor, MBR};
 
 pub type MultiPolygonCoordinates<const N: usize, U> = VectorTensor<N, U>;
 
@@ -9,8 +9,10 @@ pub struct MultiPolygon<const N: usize, U> {
     pub srid: Option<u32>,
 }
 
-impl<const N: usize, U> MultiPolygon<N, U> {
-    pub fn new<V: Into<MultiPolygonCoordinates<N, U>>>(coordinates: V) -> Self {
+impl<const N: usize, U>  GeometryImpl for MultiPolygon<N, U> {
+    type Coordinates = MultiPolygonCoordinates<N, U>;
+
+    fn new<C: Into<Self::Coordinates>>(coordinates: C) -> Self {
         Self {
             coordinates: coordinates.into(),
             srid: None,

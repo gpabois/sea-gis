@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use sql_gis::{sql_types::PgPoint, types::Point};
+use sql_gis::{sql_types::PgPoint, types::{GeometryImpl as _, Point}};
 use sqlx::{postgres::PgConnectOptions, Connection, PgConnection};
 
 struct PgInstance {
@@ -60,7 +60,7 @@ async fn setup() -> Result<PgInstance, Box<dyn Error>> {
 async fn test_postgis_isomorphism() -> Result<(), Box<dyn Error>> {
     let mut instance = setup().await.expect("failed to setup environment");
 
-    let expected = PgPoint::from(Point::new([10.1, 20.2]));
+    let expected = PgPoint::new([10.1, 20.2]);
 
     let (id,): (i32,) = sqlx::query_as("INSERT INTO gis_points (pt) VALUES ($1) RETURNING id")
         .bind(&expected)
