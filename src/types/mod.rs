@@ -124,7 +124,7 @@ impl Geometry {
         }
     }
 
-    pub fn set_srid(&mut self, srid: u32) {
+    pub fn set_srid(&mut self, srid: Option<u32>) {
         match self {
             Geometry::Point(a) => a.srid = srid,
             Geometry::LineString(a) => a.srid = srid,
@@ -141,7 +141,7 @@ impl Geometry {
         }
     }
 
-    pub fn srid(&self) -> u32 {
+    pub fn srid(&self) -> Option<u32> {
         match self {
             Geometry::Point(p) => p.srid,
             Geometry::LineString(ls) => ls.srid,

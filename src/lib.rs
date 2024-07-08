@@ -8,3 +8,5 @@ pub mod geo_json;
 
 pub mod error;
 pub mod functions;
+
+const DEFAULT_SRID: u32 = 4326;

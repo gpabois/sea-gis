@@ -6,14 +6,14 @@ pub type MultiLineStringCoordinates<const N: usize, U> = VectorMatrix<N, U>;
 /// Un ensemble de lignes brisées.
 pub struct MultiLineString<const N: usize, U> {
     pub coordinates: MultiLineStringCoordinates<N, U>,
-    pub srid: u32,
+    pub srid: Option<u32>,
 }
 
 impl<const N: usize, U> MultiLineString<N, U> {
     pub fn new<V: Into<MultiLineStringCoordinates<N, U>>>(coordinates: V) -> Self {
         Self {
             coordinates: coordinates.into(),
-            srid: 4326,
+            srid: None,
         }
     }
 }

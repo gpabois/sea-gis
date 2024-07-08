@@ -6,7 +6,7 @@ pub type MultiPointCoordinates<const N: usize, U> = VectorArray<N, U>;
 /// Un ensemble de point non relié dans un espace 2D.
 pub struct MultiPoint<const N: usize, U> {
     pub coordinates: MultiPointCoordinates<N, U>,
-    pub srid: u32,
+    pub srid: Option<u32>,
 }
 
 impl<const N: usize, U> MultiPoint<N, U>
@@ -27,7 +27,7 @@ impl<const N: usize, U> MultiPoint<N, U> {
     pub fn new<V: Into<MultiPointCoordinates<N, U>>>(coordinates: V) -> Self {
         Self {
             coordinates: coordinates.into(),
-            srid: 4326,
+            srid: None,
         }
     }
 }

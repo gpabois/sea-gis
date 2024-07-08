@@ -6,7 +6,7 @@ pub type LineStringCoordinates<const N: usize, U> = VectorArray<N, U>;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct LineString<const N: usize, U> {
     pub coordinates: LineStringCoordinates<N, U>,
-    pub srid: u32,
+    pub srid: Option<u32>,
 }
 
 
@@ -14,7 +14,7 @@ impl<const N: usize, U> LineString<N, U> {
     pub fn new<V: Into<LineStringCoordinates<N, U>>>(coordinates: V) -> Self {
         Self {
             coordinates: coordinates.into(),
-            srid: 4326,
+            srid: None,
         }
     }
 }

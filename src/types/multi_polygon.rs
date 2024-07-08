@@ -6,19 +6,15 @@ pub type MultiPolygonCoordinates<const N: usize, U> = VectorTensor<N, U>;
 /// Un ensemble de polygones
 pub struct MultiPolygon<const N: usize, U> {
     pub coordinates: MultiPolygonCoordinates<N, U>,
-    pub srid: u32,
+    pub srid: Option<u32>,
 }
 
 impl<const N: usize, U> MultiPolygon<N, U> {
     pub fn new<V: Into<MultiPolygonCoordinates<N, U>>>(coordinates: V) -> Self {
         Self {
             coordinates: coordinates.into(),
-            srid: 4326,
+            srid: None,
         }
-    }
-
-    pub fn new_with_srid(coordinates: MultiPolygonCoordinates<N, U>, srid: u32) -> Self {
-        Self { coordinates, srid }
     }
 }
 

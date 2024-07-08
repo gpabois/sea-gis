@@ -7,7 +7,7 @@ pub type PolygonCoordinates<const N: usize, U> = VectorMatrix<N, U>;
 /// Un polygone
 pub struct Polygon<const N: usize, U> {
     pub coordinates: PolygonCoordinates<N, U>,
-    pub srid: u32,
+    pub srid: Option<u32>,
 }
 
 impl<const N: usize, U> Polygon<N, U>
@@ -23,7 +23,7 @@ where
 
         Self {
             coordinates,
-            srid: 4326,
+            srid: None,
         }
     }
 }
