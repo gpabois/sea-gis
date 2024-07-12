@@ -9,7 +9,10 @@ pub struct Polygon<const N: usize, U> {
     pub srid: Option<u32>,
 }
 
-impl<const N: usize, U>  GeometryImpl for Polygon<N, U> where U: Clone + PartialEq {
+impl<const N: usize, U> GeometryImpl for Polygon<N, U>
+where
+    U: Clone + PartialEq,
+{
     type Coordinates = PolygonCoordinates<N, U>;
 
     fn new<C: Into<Self::Coordinates>>(coordinates: C) -> Self {
@@ -25,7 +28,6 @@ impl<const N: usize, U>  GeometryImpl for Polygon<N, U> where U: Clone + Partial
     }
 }
 
-
 impl<const N: usize, U> Polygon<N, U>
 where
     U: Copy + PartialOrd,
@@ -39,4 +41,3 @@ where
         }
     }
 }
-

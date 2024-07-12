@@ -8,11 +8,11 @@ pub type PointCoordinates<const N: usize, U> = Vector<N, U>;
 /// Un point dans un espace n-d.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Point<const N: usize, U> {
-    pub coordinates: PointCoordinates<N,U>,
+    pub coordinates: PointCoordinates<N, U>,
     pub srid: Option<u32>,
 }
 
-impl<const N: usize, U>  GeometryImpl for Point<N, U> {
+impl<const N: usize, U> GeometryImpl for Point<N, U> {
     type Coordinates = PointCoordinates<N, U>;
 
     fn new<C: Into<Self::Coordinates>>(coordinates: C) -> Self {
@@ -50,4 +50,3 @@ impl<const N: usize, U> DerefMut for Point<N, U> {
         self.coordinates.deref_mut()
     }
 }
-

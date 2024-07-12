@@ -6,7 +6,11 @@ use serde::{
 use std::ops::Deref;
 
 use crate::types::{
-    self, Coordinates, Geometry, GeometryImpl as _, GeometryKind, LineString, LineStringZ, MultiLineString, MultiLineStringZ, MultiPoint, MultiPointZ, MultiPolygon, MultiPolygonZ, Point, PointZ, Polygon, PolygonZ, Vector, VectorArray, VectorMatrix, VectorTensor, GEOMETRY_COLLECTION_KIND_STR, LINE_STRING_KIND_STR, MULTI_LINE_STRING_KIND_STR, MULTI_POINT_KIND_STR, MULTI_POLYGON_KIND_STR, POINT_KIND_STR, POLYGON_KIND_STR
+    self, Coordinates, Geometry, GeometryImpl as _, GeometryKind, LineString, LineStringZ,
+    MultiLineString, MultiLineStringZ, MultiPoint, MultiPointZ, MultiPolygon, MultiPolygonZ, Point,
+    PointZ, Polygon, PolygonZ, Vector, VectorArray, VectorMatrix, VectorTensor,
+    GEOMETRY_COLLECTION_KIND_STR, LINE_STRING_KIND_STR, MULTI_LINE_STRING_KIND_STR,
+    MULTI_POINT_KIND_STR, MULTI_POLYGON_KIND_STR, POINT_KIND_STR, POLYGON_KIND_STR,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -119,6 +123,44 @@ impl<'de> Visitor<'de> for GeometryVisitor {
         Ok(geom)
     }
 }
+
+macro_rules! impl_geometry_geojson {
+    ($type:ident) => {
+        paste::paste! {
+            #[derive(Clone)]
+            pub struct [<GeoJson $type:camel>](crate::types::$type);
+
+            impl Serialize for [<GeoJson $type:camel>] {
+                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where
+                    S: serde::Serializer,
+                {
+                    GeoJsonGeometry::new(Geometry::from(self.0.clone())).serialize(serializer)
+                }
+            }
+
+            impl<'de> Deserialize<'de> for [<GeoJson $type:camel>] {
+                fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                where
+                    D: de::Deserializer<'de>,
+                {
+                    let typ = $type::try_from(
+                        GeoJsonGeometry::deserialize(deserializer)?.0
+                    ).unwrap();
+
+                    Ok(Self(typ))
+                }
+            }
+        }
+    };
+}
+
+impl_geometry_geojson!(Point);
+impl_geometry_geojson!(MultiPoint);
+impl_geometry_geojson!(LineString);
+impl_geometry_geojson!(MultiLineString);
+impl_geometry_geojson!(Polygon);
+impl_geometry_geojson!(MultiPolygon);
 
 struct GeoJsonGeometryKind(GeometryKind);
 
@@ -280,7 +322,9 @@ impl Serialize for GeoJsonCoordinatesRef<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::types::{GeometryImpl as _, LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon};
+    use crate::types::{
+        GeometryImpl as _, LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon,
+    };
 
     use super::GeoJsonGeometry;
 

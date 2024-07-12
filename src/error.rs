@@ -27,4 +27,3 @@ impl Error {
         Self::InvalidGeometryKind { expecting, got }
     }
 }
-
