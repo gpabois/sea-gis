@@ -18,9 +18,8 @@ sqlx = { version = "0.7.4", features = [
 ], optional = true }
 
 [features]
-default = ["sqlx"]
+default = ["sql"]
 postgis = ["sql"]
-spatialite = ["spatialite"]
+spatialite = ["sql"]
 sql = ["sqlx"]
 geojson = []
-
