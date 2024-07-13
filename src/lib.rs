@@ -4,6 +4,15 @@ macro_rules! impl_geometry_proxy {
             #[derive(Debug, Clone, PartialEq)]
             pub struct [<$ns $geometry_type>] (pub(crate) crate::types::$geometry_type);
 
+            impl crate::types::GeometryImpl for [<$ns $geometry_type>] {
+                type Coordinates = <crate::types::$geometry_type as crate::types::GeometryImpl>::Coordinates;
+
+                fn new<C: Into<Self::Coordinates>>(coordinates: C) -> Self {
+                    Self::from(crate::types::$geometry_type::new(coordinates))
+
+                }
+            }
+
             impl From<[<$ns $geometry_type>]> for crate::types::Geometry  {
                 fn from(value: [<$ns $geometry_type>]) -> Self {
                     value.0.into()
@@ -66,7 +75,6 @@ pub mod ewkb;
 #[cfg(feature = "geojson")]
 pub mod geojson;
 
-#[cfg(feature = "sql")]
 pub mod sql_types;
 
 pub mod types;

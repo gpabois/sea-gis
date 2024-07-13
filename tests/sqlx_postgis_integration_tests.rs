@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use sql_gis::{sql_types::PgPoint, types::GeometryImpl as _};
+use sql_gis::sql_types::PgPoint;
 use sqlx::{postgres::PgConnectOptions, Connection, PgConnection};
 
 struct PgInstance {

@@ -127,9 +127,6 @@ impl<'de> Visitor<'de> for GeometryVisitor {
 macro_rules! impl_geometry_geojson {
     ($type:ident) => {
         paste::paste! {
-            #[derive(Clone)]
-            pub struct [<GeoJson $type:camel>](crate::types::$type);
-
             impl Serialize for [<GeoJson $type:camel>] {
                 fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
                 where
@@ -161,6 +158,8 @@ impl_geometry_geojson!(LineString);
 impl_geometry_geojson!(MultiLineString);
 impl_geometry_geojson!(Polygon);
 impl_geometry_geojson!(MultiPolygon);
+
+impl_geometry_proxies!(GeoJson);
 
 struct GeoJsonGeometryKind(GeometryKind);
 
