@@ -114,9 +114,9 @@ impl<'de> Visitor<'de> for GeometryVisitor {
                 MultiPolygonZ::new(a).into()
             }
             _ => {
-                return Err(A::Error::custom(format!(
-                    "incompatible geometry type with the given coordinates"
-                )))
+                return Err(A::Error::custom(
+                    "incompatible geometry type with the given coordinates".to_string(),
+                ))
             }
         };
 
@@ -263,8 +263,7 @@ impl<const N: usize> Serialize for VectorArrayRef<'_, N> {
         let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
         self.0
             .iter()
-            .map(|value| seq.serialize_element(&VectorRef(value)))
-            .collect::<Result<_, _>>()?;
+            .try_for_each(|value| seq.serialize_element(&VectorRef(value)))?;
         seq.end()
     }
 }
@@ -279,8 +278,7 @@ impl<const N: usize> Serialize for VectorMatrixRef<'_, N> {
         let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
         self.0
             .iter()
-            .map(|value| seq.serialize_element(&VectorArrayRef(value)))
-            .collect::<Result<_, _>>()?;
+            .try_for_each(|value| seq.serialize_element(&VectorArrayRef(value)))?;
         seq.end()
     }
 }
@@ -295,8 +293,7 @@ impl<const N: usize> Serialize for VectorTensorRef<'_, N> {
         let mut seq = serializer.serialize_seq(Some(self.0.len()))?;
         self.0
             .iter()
-            .map(|value| seq.serialize_element(&VectorMatrixRef(value)))
-            .collect::<Result<_, _>>()?;
+            .try_for_each(|value| seq.serialize_element(&VectorMatrixRef(value)))?;
         seq.end()
     }
 }

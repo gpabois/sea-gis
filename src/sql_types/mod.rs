@@ -60,6 +60,7 @@ mod ewkb;
 
 #[cfg(feature = "postgis")]
 mod postgis;
+
 #[cfg(feature = "spatialite")]
 mod spatialite;
 

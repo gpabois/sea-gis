@@ -33,7 +33,7 @@ impl Encodable for EWKBGeometry {
 
 impl Decodable for EWKBGeometry {
     fn decode<R: Read>(stream: &mut R) -> Result<Self, std::io::Error> {
-        decode_geometry(stream).map(|geom| Self(geom))
+        decode_geometry(stream).map(Self)
     }
 }
 
@@ -287,8 +287,7 @@ fn encode_vector<const N: usize, E: ByteOrder, W: Write>(
     vector
         .iter()
         .copied()
-        .map(|scalar| stream.write_f64::<E>(scalar))
-        .collect::<Result<_, _>>()
+        .try_for_each(|scalar| stream.write_f64::<E>(scalar))
 }
 
 fn decode_vector<const N: usize, E: ByteOrder, R: Read>(
@@ -310,8 +309,7 @@ fn encode_array<const N: usize, E: ByteOrder, W: Write>(
     stream.write_u32::<E>(array.len() as u32)?;
     array
         .iter()
-        .map(|vector| encode_vector::<N, E, _>(vector, stream))
-        .collect::<Result<_, _>>()
+        .try_for_each(|vector| encode_vector::<N, E, _>(vector, stream))
 }
 
 fn decode_array<const N: usize, E: ByteOrder, R: Read>(
@@ -334,8 +332,7 @@ fn encode_matrix<const N: usize, E: ByteOrder, W: Write>(
     stream.write_u32::<E>(matrix.len() as u32)?;
     matrix
         .iter()
-        .map(|array| encode_array::<N, E, _>(array, stream))
-        .collect::<Result<_, _>>()
+        .try_for_each(|array| encode_array::<N, E, _>(array, stream))
 }
 
 fn decode_matrix<const N: usize, E: ByteOrder, R: Read>(
@@ -358,8 +355,7 @@ fn encode_tensor<const N: usize, E: ByteOrder, W: Write>(
     stream.write_u32::<E>(tensor.len() as u32)?;
     tensor
         .iter()
-        .map(|matrix| encode_matrix::<N, E, _>(matrix, stream))
-        .collect::<Result<_, _>>()
+        .try_for_each(|matrix| encode_matrix::<N, E, _>(matrix, stream))
 }
 
 fn decode_tensor<const N: usize, E: ByteOrder, R: Read>(
