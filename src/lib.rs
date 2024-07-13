@@ -64,7 +64,7 @@ pub mod error;
 pub mod ewkb;
 
 #[cfg(feature = "geojson")]
-pub mod geo_json;
+pub mod geojson;
 
 #[cfg(feature = "sql")]
 pub mod sql_types;
@@ -72,4 +72,3 @@ pub mod sql_types;
 pub mod types;
 
 const DEFAULT_SRID: u32 = 4326;
-
