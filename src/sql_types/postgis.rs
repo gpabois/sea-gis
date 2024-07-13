@@ -33,6 +33,7 @@ impl DerefMut for PgGeometry {
 
 impl_geometry_proxies!(Pg);
 
+#[cfg(feature = "sqlx")]
 mod sqlx {
     use ::sqlx::{postgres::PgTypeInfo, Decode, Encode, Postgres, Type};
 

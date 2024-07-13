@@ -6,9 +6,15 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::{io::{Decodable, Encodable}, types::{
-    CoordinatesRef, Geometry, GeometryImpl as _, GeometryKind, LineString, LineStringZ, MultiLineString, MultiLineStringZ, MultiPoint, MultiPointZ, MultiPolygon, MultiPolygonZ, Point, PointZ, Polygon, PolygonZ, Vector, VectorArray, VectorMatrix, VectorTensor, MBR
-}, DEFAULT_SRID};
+use crate::{
+    io::{Decodable, Encodable},
+    types::{
+        CoordinatesRef, Geometry, GeometryImpl as _, GeometryKind, LineString, LineStringZ,
+        MultiLineString, MultiLineStringZ, MultiPoint, MultiPointZ, MultiPolygon, MultiPolygonZ,
+        Point, PointZ, Polygon, PolygonZ, Vector, VectorArray, VectorMatrix, VectorTensor, MBR,
+    },
+    DEFAULT_SRID,
+};
 
 const BIG_ENDIAN: u8 = 0;
 const LITTLE_ENDIAN: u8 = 1;
@@ -67,6 +73,7 @@ impl From<SpatiaLiteGeometry> for Geometry {
 
 impl_geometry_proxies!(SpatiaLite);
 
+#[cfg(feature = "sqlx")]
 /// Implémente l'encodage / décodage depuis sqlx
 mod sqlx {
     use super::*;
@@ -82,11 +89,8 @@ mod sqlx {
         }
     }
 
-    impl<'r> Decode<'r, Sqlite> for SpatiaLiteGeometry
-    {
-        fn decode(
-            value: SqliteValueRef<'r>,
-        ) -> Result<Self, ::sqlx::error::BoxDynError> {
+    impl<'r> Decode<'r, Sqlite> for SpatiaLiteGeometry {
+        fn decode(value: SqliteValueRef<'r>) -> Result<Self, ::sqlx::error::BoxDynError> {
             let mut encoded = <&'r [u8] as Decode<'r, Sqlite>>::decode(value)?;
             let geom = decode_geometry(&mut encoded).map(Self::new)?;
             Ok(geom)
@@ -110,26 +114,32 @@ mod sqlx {
     impl_geometry_sqlx_codecs!(SpatiaLite);
 }
 
-
-pub fn encode_geometry<W: Write>(geometry: &Geometry, stream: &mut W) -> Result<(), std::io::Error> {
+pub fn encode_geometry<W: Write>(
+    geometry: &Geometry,
+    stream: &mut W,
+) -> Result<(), std::io::Error> {
     encode_geometry_with_endianess::<NativeEndian, _>(geometry, stream)
 }
 
-pub fn encode_geometry_with_endianess<E: ByteOrder, W: Write>(geometry: &Geometry, stream: &mut W) -> Result<(), std::io::Error> 
-where Endianess: From<PhantomData<E>>
+pub fn encode_geometry_with_endianess<E: ByteOrder, W: Write>(
+    geometry: &Geometry,
+    stream: &mut W,
+) -> Result<(), std::io::Error>
+where
+    Endianess: From<PhantomData<E>>,
 {
     // encode start byte, always 0x00
     stream.write_u8(0)?;
-    
-    // encode endianness 
+
+    // encode endianness
     stream.write_u8(Endianess::from(PhantomData::<E>).into())?;
-   
+
     // encode SRID
     stream.write_u32::<E>(geometry.srid().unwrap_or(DEFAULT_SRID))?;
-    
+
     // encode MBR
     encode_mbr::<E, _>(&geometry.mbr(), stream)?;
-    
+
     // encode geometry class
     encode_geometry_class::<E, _>(&geometry.kind(), stream)?;
 
@@ -143,7 +153,7 @@ where Endianess: From<PhantomData<E>>
 pub fn decode_geometry<R: Read>(stream: &mut R) -> Result<Geometry, std::io::Error> {
     // start byte must be 0x00
     assert_eq!(stream.read_u8()?, 0);
-    
+
     let endian = stream.read_u8()?;
 
     if endian == BIG_ENDIAN {
@@ -155,7 +165,9 @@ pub fn decode_geometry<R: Read>(stream: &mut R) -> Result<Geometry, std::io::Err
     }
 }
 
-fn decode_geometry_with_endianess<E: ByteOrder, R: Read>(stream: &mut R) -> Result<Geometry, std::io::Error> {
+fn decode_geometry_with_endianess<E: ByteOrder, R: Read>(
+    stream: &mut R,
+) -> Result<Geometry, std::io::Error> {
     // Read the SRID
     let srid: u32 = stream.read_u32::<E>()?;
 
@@ -171,27 +183,34 @@ fn decode_geometry_with_endianess<E: ByteOrder, R: Read>(stream: &mut R) -> Resu
         GeometryKind::LineString => LineString::new(decode_array::<2, E, _>(stream)?).into(),
         GeometryKind::Polygon => Polygon::new(decode_matrix::<2, E, _>(stream)?).into(),
         GeometryKind::MultiPoint => MultiPoint::new(decode_array::<2, E, _>(stream)?).into(),
-        GeometryKind::MultiLineString => MultiLineString::new(decode_matrix::<2, E, _>(stream)?).into(),
+        GeometryKind::MultiLineString => {
+            MultiLineString::new(decode_matrix::<2, E, _>(stream)?).into()
+        }
         GeometryKind::MultiPolygon => MultiPolygon::new(decode_tensor::<2, E, _>(stream)?).into(),
         GeometryKind::GeometryCollection => todo!(),
         GeometryKind::PointZ => PointZ::new(decode_vector::<3, E, _>(stream)?).into(),
         GeometryKind::LineStringZ => LineStringZ::new(decode_array::<3, E, _>(stream)?).into(),
         GeometryKind::PolygonZ => PolygonZ::new(decode_matrix::<3, E, _>(stream)?).into(),
         GeometryKind::MultiPointZ => MultiPointZ::new(decode_array::<3, E, _>(stream)?).into(),
-        GeometryKind::MultiLineStringZ => MultiLineStringZ::new(decode_matrix::<3, E, _>(stream)?).into(),
+        GeometryKind::MultiLineStringZ => {
+            MultiLineStringZ::new(decode_matrix::<3, E, _>(stream)?).into()
+        }
         GeometryKind::MultiPolygonZ => MultiPolygonZ::new(decode_tensor::<3, E, _>(stream)?).into(),
         GeometryKind::GeometryCollectionZ => todo!(),
     };
 
     geom.set_srid(Some(srid));
-    
+
     let end = stream.read_u8()?;
     assert_eq!(end, 0xFE);
 
     Ok(geom)
 }
 
-fn encode_geometry_class<E: ByteOrder, W: Write>(kind: &GeometryKind, stream: &mut W) -> Result<(), std::io::Error> {
+fn encode_geometry_class<E: ByteOrder, W: Write>(
+    kind: &GeometryKind,
+    stream: &mut W,
+) -> Result<(), std::io::Error> {
     let encoded = match kind {
         GeometryKind::Point => 1,
         GeometryKind::LineString => 2,
@@ -212,7 +231,9 @@ fn encode_geometry_class<E: ByteOrder, W: Write>(kind: &GeometryKind, stream: &m
     stream.write_u32::<E>(encoded)
 }
 
-fn decode_geometry_class<E: ByteOrder, R: Read>(stream: &mut R) -> Result<GeometryKind, std::io::Error> {
+fn decode_geometry_class<E: ByteOrder, R: Read>(
+    stream: &mut R,
+) -> Result<GeometryKind, std::io::Error> {
     Ok(match stream.read_u32::<E>()? {
         1 => GeometryKind::Point,
         2 => GeometryKind::LineString,
@@ -234,7 +255,10 @@ fn decode_geometry_class<E: ByteOrder, R: Read>(stream: &mut R) -> Result<Geomet
     })
 }
 
-fn encode_mbr<E: ByteOrder, W: Write>(mbr: &MBR<f64>, stream: &mut W) -> Result<(), std::io::Error> {
+fn encode_mbr<E: ByteOrder, W: Write>(
+    mbr: &MBR<f64>,
+    stream: &mut W,
+) -> Result<(), std::io::Error> {
     stream.write_f64::<E>(mbr.min_x)?;
     stream.write_f64::<E>(mbr.min_y)?;
     stream.write_f64::<E>(mbr.max_x)?;
@@ -259,7 +283,10 @@ fn decode_mbr<E: ByteOrder, R: Read>(stream: &mut R) -> Result<MBR<f64>, std::io
     })
 }
 
-fn encode_coordinates<E: ByteOrder, W: Write>(coordinates: CoordinatesRef<'_>, stream: &mut W) -> Result<(), std::io::Error> {
+fn encode_coordinates<E: ByteOrder, W: Write>(
+    coordinates: CoordinatesRef<'_>,
+    stream: &mut W,
+) -> Result<(), std::io::Error> {
     match coordinates {
         CoordinatesRef::Vector2D(vector) => encode_vector::<2, E, _>(vector, stream),
         CoordinatesRef::VectorArray2D(array) => encode_array::<2, E, _>(array, stream),
@@ -272,11 +299,20 @@ fn encode_coordinates<E: ByteOrder, W: Write>(coordinates: CoordinatesRef<'_>, s
     }
 }
 
-fn encode_vector<const N: usize, E: ByteOrder, W: Write>(vector: &Vector<N, f64>, stream: &mut W) -> Result<(), std::io::Error> {
-    vector.iter().copied().map(|scalar| stream.write_f64::<E>(scalar)).collect::<Result<_, _>>()
+fn encode_vector<const N: usize, E: ByteOrder, W: Write>(
+    vector: &Vector<N, f64>,
+    stream: &mut W,
+) -> Result<(), std::io::Error> {
+    vector
+        .iter()
+        .copied()
+        .map(|scalar| stream.write_f64::<E>(scalar))
+        .collect::<Result<_, _>>()
 }
 
-fn decode_vector<const N: usize, E: ByteOrder, R: Read>(stream: &mut R) -> Result<Vector<N, f64>, std::io::Error> {
+fn decode_vector<const N: usize, E: ByteOrder, R: Read>(
+    stream: &mut R,
+) -> Result<Vector<N, f64>, std::io::Error> {
     let mut scalars: [f64; N] = [0f64; N];
 
     for i in 0..N {
@@ -286,13 +322,20 @@ fn decode_vector<const N: usize, E: ByteOrder, R: Read>(stream: &mut R) -> Resul
     Ok(Vector::new(scalars))
 }
 
-
-fn encode_array<const N: usize, E: ByteOrder, W: Write>(array: &VectorArray<N, f64>, stream: &mut W) -> Result<(), std::io::Error> {
-        stream.write_u32::<E>(array.len() as u32)?;
-        array.iter().map(|vector| encode_vector::<N, E, _>(vector, stream)).collect::<Result<_, _>>()
+fn encode_array<const N: usize, E: ByteOrder, W: Write>(
+    array: &VectorArray<N, f64>,
+    stream: &mut W,
+) -> Result<(), std::io::Error> {
+    stream.write_u32::<E>(array.len() as u32)?;
+    array
+        .iter()
+        .map(|vector| encode_vector::<N, E, _>(vector, stream))
+        .collect::<Result<_, _>>()
 }
 
-fn decode_array<const N: usize, E: ByteOrder, R: Read>(stream: &mut R) -> Result<VectorArray<N, f64>, std::io::Error> {
+fn decode_array<const N: usize, E: ByteOrder, R: Read>(
+    stream: &mut R,
+) -> Result<VectorArray<N, f64>, std::io::Error> {
     let nb_points: u32 = stream.read_u32::<E>()?;
     let mut coordinates = Vec::<Vector<N, f64>>::with_capacity(nb_points as usize);
 
@@ -303,12 +346,20 @@ fn decode_array<const N: usize, E: ByteOrder, R: Read>(stream: &mut R) -> Result
     Ok(VectorArray::new(coordinates))
 }
 
-fn encode_matrix<const N: usize, E: ByteOrder, W: Write>(matrix: &VectorMatrix<N, f64>, stream: &mut W) -> Result<(), std::io::Error> {
-        stream.write_u32::<E>(matrix.len() as u32)?;
-        matrix.iter().map(|array| encode_array::<N, E, _>(array, stream)).collect::<Result<_, _>>()
+fn encode_matrix<const N: usize, E: ByteOrder, W: Write>(
+    matrix: &VectorMatrix<N, f64>,
+    stream: &mut W,
+) -> Result<(), std::io::Error> {
+    stream.write_u32::<E>(matrix.len() as u32)?;
+    matrix
+        .iter()
+        .map(|array| encode_array::<N, E, _>(array, stream))
+        .collect::<Result<_, _>>()
 }
 
-fn decode_matrix<const N: usize, E: ByteOrder, R: Read>(stream: &mut R) -> Result<VectorMatrix<N, f64>, std::io::Error> {
+fn decode_matrix<const N: usize, E: ByteOrder, R: Read>(
+    stream: &mut R,
+) -> Result<VectorMatrix<N, f64>, std::io::Error> {
     let nb_points: u32 = stream.read_u32::<E>()?;
     let mut coordinates = Vec::<VectorArray<N, f64>>::with_capacity(nb_points as usize);
 
@@ -319,12 +370,20 @@ fn decode_matrix<const N: usize, E: ByteOrder, R: Read>(stream: &mut R) -> Resul
     Ok(VectorMatrix::new(coordinates))
 }
 
-fn encode_tensor<const N: usize, E: ByteOrder, W: Write>(tensor: &VectorTensor<N, f64>, stream: &mut W) -> Result<(), std::io::Error> {
+fn encode_tensor<const N: usize, E: ByteOrder, W: Write>(
+    tensor: &VectorTensor<N, f64>,
+    stream: &mut W,
+) -> Result<(), std::io::Error> {
     stream.write_u32::<E>(tensor.len() as u32)?;
-    tensor.iter().map(|matrix| encode_matrix::<N, E, _>(matrix, stream)).collect::<Result<_, _>>()
+    tensor
+        .iter()
+        .map(|matrix| encode_matrix::<N, E, _>(matrix, stream))
+        .collect::<Result<_, _>>()
 }
 
-fn decode_tensor<const N: usize, E: ByteOrder, R: Read>(stream: &mut R) -> Result<VectorTensor<N, f64>, std::io::Error> {
+fn decode_tensor<const N: usize, E: ByteOrder, R: Read>(
+    stream: &mut R,
+) -> Result<VectorTensor<N, f64>, std::io::Error> {
     let nb_points: u32 = stream.read_u32::<E>()?;
     let mut coordinates = Vec::<VectorMatrix<N, f64>>::with_capacity(nb_points as usize);
 

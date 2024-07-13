@@ -1,3 +1,4 @@
+#[cfg(feature = "sqlx")]
 /// Implémente l'encodage / décodage depuis sqlx
 mod sqlx {
     use crate::{
